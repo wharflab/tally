@@ -1,0 +1,452 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+      "violations": [
+        {
+          "detail": "Add a HEALTHCHECK instruction to enable container health monitoring. Use HEALTHCHECK CMD to define a check command, or HEALTHCHECK NONE to explicitly opt out. Note: HEALTHCHECK is inherited from base images at runtime, so this may be a false positive if your base image already defines one.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3057/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": -1,
+              "line": -1
+            }
+          },
+          "message": "`HEALTHCHECK` instruction missing",
+          "rule": "hadolint/DL3057",
+          "severity": "info"
+        },
+        {
+          "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-unreachable-stages/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "stage \"builder\" (index 0) is not reachable from the final stage and does not contribute to the final image",
+          "rule": "tally/no-unreachable-stages",
+          "severity": "warning",
+          "sourceCode": "FROM ruby:3.3-slim AS builder"
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-between-instructions/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "expected blank line between FROM and RUN",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "RUN bundle install \\",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        },
+        {
+          "detail": "Detected package install/build command; add cache mount(s): /root/.gem (id=gem)",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-package-cache-mounts/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "use cache mounts for package manager cache directories",
+          "rule": "tally/prefer-package-cache-mounts",
+          "severity": "info",
+          "sourceCode": "RUN bundle install \\",
+          "suggestedFix": {
+            "description": "Add package cache mount(s)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 4,
+                    "line": 5
+                  },
+                  "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 5
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.gem,id=gem "
+              }
+            ],
+            "priority": 90,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "`bootsnap precompile` defaults to host CPU parallelism, which crashes under QEMU multi-arch builds (see https://github.com/Shopify/bootsnap/issues/495). The Rails generator template carries `-j 1` for exactly this reason.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/bootsnap-precompile-without-j1/",
+          "location": {
+            "end": {
+              "column": 38,
+              "line": 6
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 19,
+              "line": 6
+            }
+          },
+          "message": "`bootsnap precompile` runs without `-j 1`, which crashes under QEMU multi-arch builds",
+          "rule": "tally/ruby/bootsnap-precompile-without-j1",
+          "severity": "warning",
+          "sourceCode": "    \u0026\u0026 bundle exec bootsnap precompile --gemfile",
+          "suggestedFix": {
+            "description": "Insert `-j 1` after `bootsnap precompile` to avoid the QEMU multi-arch crash",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 38,
+                    "line": 6
+                  },
+                  "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+                  "start": {
+                    "column": 38,
+                    "line": 6
+                  }
+                },
+                "newText": " -j 1"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88
+          }
+        },
+        {
+          "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-unreachable-stages/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 9
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 9
+            }
+          },
+          "message": "stage \"app-compliant\" (index 1) is not reachable from the final stage and does not contribute to the final image",
+          "rule": "tally/no-unreachable-stages",
+          "severity": "warning",
+          "sourceCode": "FROM ruby:3.3-slim AS app-compliant"
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-between-instructions/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "expected blank line between FROM and RUN",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "RUN bundle exec bootsnap precompile -j 1 app/ lib/",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        },
+        {
+          "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-unreachable-stages/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 13
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 13
+            }
+          },
+          "message": "stage \"dev\" (index 2) is not reachable from the final stage and does not contribute to the final image",
+          "rule": "tally/no-unreachable-stages",
+          "severity": "warning",
+          "sourceCode": "FROM ruby:3.3-slim AS dev"
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-between-instructions/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 14
+            }
+          },
+          "message": "expected blank line between FROM and RUN",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "RUN bundle exec bootsnap precompile app/ lib/",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        },
+        {
+          "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-unreachable-stages/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 18
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 18
+            }
+          },
+          "message": "stage \"app-platform-guarded\" (index 3) is not reachable from the final stage and does not contribute to the final image",
+          "rule": "tally/no-unreachable-stages",
+          "severity": "warning",
+          "sourceCode": "FROM ruby:3.3-slim AS app-platform-guarded"
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-between-instructions/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 19
+            }
+          },
+          "message": "expected blank line between FROM and ARG",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "ARG BUILDPLATFORM",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-between-instructions/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 21
+            }
+          },
+          "message": "expected blank line between ARG and RUN",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "RUN if [ \"$BUILDPLATFORM\" = \"$TARGETPLATFORM\" ]; then \\",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        },
+        {
+          "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-unreachable-stages/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 26
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 26
+            }
+          },
+          "message": "stage \"bootsnap-doctor\" (index 4) is not reachable from the final stage and does not contribute to the final image",
+          "rule": "tally/no-unreachable-stages",
+          "severity": "warning",
+          "sourceCode": "FROM ruby:3.3-slim AS bootsnap-doctor"
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-between-instructions/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 27
+            }
+          },
+          "message": "expected blank line between FROM and RUN",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "RUN bootsnap doctor",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-between-instructions/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 32
+            }
+          },
+          "message": "expected blank line between FROM and RUN",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "RUN bundle exec bootsnap precompile app/ lib/",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        },
+        {
+          "detail": "`bootsnap precompile` defaults to host CPU parallelism, which crashes under QEMU multi-arch builds (see https://github.com/Shopify/bootsnap/issues/495). The Rails generator template carries `-j 1` for exactly this reason.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/bootsnap-precompile-without-j1/",
+          "location": {
+            "end": {
+              "column": 35,
+              "line": 32
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 16,
+              "line": 32
+            }
+          },
+          "message": "`bootsnap precompile` runs without `-j 1`, which crashes under QEMU multi-arch builds",
+          "rule": "tally/ruby/bootsnap-precompile-without-j1",
+          "severity": "warning",
+          "sourceCode": "RUN bundle exec bootsnap precompile app/ lib/",
+          "suggestedFix": {
+            "description": "Insert `-j 1` after `bootsnap precompile` to avoid the QEMU multi-arch crash",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 35,
+                    "line": 32
+                  },
+                  "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+                  "start": {
+                    "column": 35,
+                    "line": 32
+                  }
+                },
+                "newText": " -j 1"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88
+          }
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-between-instructions/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 33
+            }
+          },
+          "message": "expected blank line between RUN and CMD",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "CMD [\"bin/rails\", \"server\"]",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 111,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 2,
+    "style": 8,
+    "total": 17,
+    "warnings": 7
+  }
+}
