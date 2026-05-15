@@ -1,0 +1,11 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/ruby/yjit-not-enabled-on-supported-runtime"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

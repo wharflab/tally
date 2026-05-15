@@ -1,0 +1,87 @@
+---
+title: "tally/ruby/yjit-not-enabled-on-supported-runtime"
+description: "Ruby 3.3+ runtime image doesn't enable YJIT, missing a near-free 15-30% CPU win."
+---
+
+The final Ruby 3.3+ runtime stage doesn't enable YJIT — Ruby's bundled JIT compiler.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Performance |
+| Default | Enabled |
+| Auto-fix | Yes (`FixSuggestion`) |
+
+## Description
+
+YJIT is Ruby's bundled JIT compiler. As of Ruby 3.3, it's production-ready and delivers a 15–30% CPU win on
+most Rails workloads at near-zero cost. But it's opt-in: you have to set `RUBY_YJIT_ENABLE=1`, pass `--yjit`
+to the Ruby/Rails binary, or include `--yjit` in `RUBYOPT`.
+
+The corpus shows only **3 of 196** Rails Dockerfiles enable YJIT. For projects on Ruby 3.3+ this is a
+near-free performance gain that's missing from almost every production deployment.
+
+This rule fires when:
+
+- The final stage's effective Ruby version is 3.3 or later (resolved from the base image tag, or from
+  `.ruby-version` / `.tool-versions` / `Gemfile.lock`'s `RUBY VERSION` block when the base is ARG-templated).
+- The stage looks like a long-running Ruby server (ENTRYPOINT/CMD references `rails`, `puma`, `unicorn`,
+  `thrust`, `rackup`, `sidekiq`, `falcon`, `thin`, `passenger`, or `iodine`).
+- None of these YJIT signals is present:
+  - `ENV RUBY_YJIT_ENABLE=...` (any truthy value).
+  - `ENV RUBYOPT="--yjit"` (or contains `--yjit`).
+  - ENTRYPOINT/CMD passes `--yjit` to the binary.
+
+### Suppressions
+
+The rule skips:
+
+- Ruby `< 3.3` — YJIT existed but was experimental and had Rails-specific regressions.
+- Non-final stages (only the production runtime image matters for YJIT).
+- CLI-only Ruby images (no rails/puma/sidekiq/etc. ENTRYPOINT) — JIT warmup dominates short-lived processes.
+- Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug`.
+- Non-Ruby and Windows stages.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+COPY . .
+CMD ["bin/rails", "server"]
+```
+
+### After
+
+```dockerfile
+FROM ruby:3.3-slim
+ENV RUBY_YJIT_ENABLE="1"
+COPY . .
+CMD ["bin/rails", "server"]
+```
+
+Equivalent forms also satisfy the rule:
+
+```dockerfile
+ENV RUBYOPT="--yjit"
+```
+
+```dockerfile
+CMD ["bin/rails", "server", "--yjit"]
+```
+
+## Auto-fix
+
+`FixSuggestion`. Inserts `ENV RUBY_YJIT_ENABLE="1"` on the line immediately after the final stage's `FROM`.
+The fix is suggestion-level because performance changes — even good ones — are best applied with the user's
+explicit consent.
+
+## References
+
+- [Ruby 3.3 release notes](https://www.ruby-lang.org/en/news/2023/12/25/ruby-3-3-0-released/) —
+  declares YJIT production-ready.
+- [YJIT documentation](https://github.com/ruby/ruby/blob/master/doc/yjit/yjit.md) — opt-in environment
+  variable and CLI flag.
+- [Mastodon Dockerfile](https://github.com/mastodon/mastodon/blob/main/Dockerfile) — production-grade
+  example that enables YJIT.
