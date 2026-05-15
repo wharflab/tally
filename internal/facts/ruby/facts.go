@@ -7,6 +7,10 @@
 // rules then degrade gracefully to Dockerfile-only mode.
 package ruby
 
+import (
+	"strings"
+)
+
 // RubyFacts bundles every observable Ruby project file the rule namespace
 // cares about. Each pointer is nil when the underlying file is missing,
 // unobservable, or malformed.
@@ -104,44 +108,14 @@ func resolveRubyVersion(reader ContextFileReader, lock *LockfileFacts) string {
 //	"ruby 3.3.5p100"  -> "3.3.5p100"
 //	"3.3.5"           -> "3.3.5"
 func extractRubyVersionFromLockfile(raw string) string {
-	if raw == "" {
+	fields := strings.Fields(raw)
+	if len(fields) == 0 {
 		return ""
 	}
-	// Drop a leading "ruby" word, then return the next field. We avoid
-	// strings.Fields here so that values like "ruby 3.3.5p100 with stuff"
-	// still return "3.3.5p100".
-	parts := splitFieldsLimit(raw, 3)
-	if len(parts) == 0 {
-		return ""
+	if len(fields) >= 2 && strings.EqualFold(fields[0], "ruby") {
+		return fields[1]
 	}
-	if len(parts) >= 2 && (parts[0] == "ruby" || parts[0] == "Ruby") {
-		return parts[1]
-	}
-	return parts[0]
-}
-
-func splitFieldsLimit(s string, limit int) []string {
-	out := make([]string, 0, limit)
-	start := -1
-	for i := range len(s) {
-		if s[i] == ' ' || s[i] == '\t' {
-			if start >= 0 {
-				out = append(out, s[start:i])
-				start = -1
-				if len(out) == limit {
-					return out
-				}
-			}
-			continue
-		}
-		if start < 0 {
-			start = i
-		}
-	}
-	if start >= 0 && len(out) < limit {
-		out = append(out, s[start:])
-	}
-	return out
+	return fields[0]
 }
 
 // safeRead wraps reader.ReadFile so callers do not need to discriminate

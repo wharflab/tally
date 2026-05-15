@@ -104,18 +104,7 @@ func ParseGemfile(content []byte) *GemfileFacts {
 		}
 	}
 
-	if !looksLikeGemfile(facts) {
-		return nil
-	}
 	return facts
-}
-
-func looksLikeGemfile(facts *GemfileFacts) bool {
-	return facts.RubyConstraint != "" ||
-		len(facts.Sources) > 0 ||
-		len(facts.GitGems) > 0 ||
-		facts.HasDevGroup ||
-		facts.HasTestGroup
 }
 
 // stripGemfileComments removes `#` comments from each line, preserving `#`

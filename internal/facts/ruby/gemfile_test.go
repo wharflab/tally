@@ -75,23 +75,44 @@ func TestParseGemfile_NoDevGroup(t *testing.T) {
 	}
 }
 
-func TestParseGemfile_EmptyAndUnrecognized(t *testing.T) {
+func TestParseGemfile_EmptyContentReturnsNil(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string][]byte{
-		"nil":         nil,
-		"empty":       {},
-		"whitespace":  []byte("   \n\n   \n"),
-		"only_code":   []byte("puts 'hello'\n"),
-		"only_comm":   []byte("# Header comment\n# Another comment\n"),
-		"unrelated":   []byte("module Foo; end\n"),
-		"single_word": []byte("ruby\n"),
+		"nil":           nil,
+		"empty":         {},
+		"whitespace":    []byte("   \n\n   \n"),
+		"only_comments": []byte("# Header comment\n# Another comment\n"),
 	}
 	for name, content := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			if got := ParseGemfile(content); got != nil {
 				t.Errorf("ParseGemfile(%q) = %+v, want nil", name, got)
+			}
+		})
+	}
+}
+
+// regression: a Gemfile containing only a single tracked-feature-free entry
+// (e.g. `gem "rails"`) should still yield a non-nil GemfileFacts so rules
+// that just check Gemfile presence can do so without losing signal.
+func TestParseGemfile_PresentButNoTrackedFeatures(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"single_gem":  `gem "rails"` + "\n",
+		"only_module": "module Foo; end\n",
+		"only_code":   "puts 'hello'\n",
+		"only_word":   "ruby\n",
+		"gemspec":     "gemspec\n",
+	}
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := ParseGemfile([]byte(content))
+			if got == nil {
+				t.Errorf("ParseGemfile(%q) = nil, want non-nil zero-value GemfileFacts", content)
 			}
 		})
 	}
