@@ -377,11 +377,9 @@ func prepareMockRegistry(tmpDir string) (string, error) {
 		})
 	}
 	wg.Wait()
-	for _, err := range errs {
-		if err != nil {
-			mockRegistry.Close()
-			return "", err
-		}
+	if err := errors.Join(errs...); err != nil {
+		mockRegistry.Close()
+		return "", err
 	}
 
 	// Write registries.conf redirecting every registry our fixtures touch
