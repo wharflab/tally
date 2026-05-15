@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
@@ -169,6 +170,38 @@ RUN bundle install
 	}
 	if !strings.Contains(v.SuggestedFix.Edits[0].NewText, `BUNDLE_DEPLOYMENT="1"`) {
 		t.Errorf("fix text missing BUNDLE_DEPLOYMENT: %q", v.SuggestedFix.Edits[0].NewText)
+	}
+}
+
+// TestMissingBundleDeploymentRule_FixHandlesFROMLineContinuation regression-tests
+// the case where `FROM` uses a backslash line continuation. The parser-reported
+// stage location ends on the first physical line of the FROM, but the
+// fix needs to insert AFTER the final continuation line — otherwise the
+// new ENV line lands inside the FROM, producing a syntactically broken
+// Dockerfile. The shared helper resolves the actual end via SourceMap's
+// ResolveEndLine.
+func TestMissingBundleDeploymentRule_FixHandlesFROMLineContinuation(t *testing.T) {
+	t.Parallel()
+
+	src := "FROM \\\n    ruby:3.3-slim\n" +
+		"ENV RAILS_ENV=\"production\"\n" +
+		"RUN bundle install\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", src)
+	violations := NewMissingBundleDeploymentRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	v := violations[0]
+	if v.SuggestedFix == nil {
+		t.Fatal("expected a suggested fix")
+	}
+	got := string(fix.ApplyFix([]byte(src), v.SuggestedFix))
+	want := "FROM \\\n    ruby:3.3-slim\n" +
+		"ENV BUNDLE_DEPLOYMENT=\"1\"\n" +
+		"ENV RAILS_ENV=\"production\"\n" +
+		"RUN bundle install\n"
+	if got != want {
+		t.Errorf("fix landed inside the FROM continuation;\ngot:\n%s\nwant:\n%s", got, want)
 	}
 }
 

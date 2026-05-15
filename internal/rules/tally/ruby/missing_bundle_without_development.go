@@ -409,7 +409,7 @@ func buildBundleWithoutDevelopmentFix(
 	}
 	value := chooseBundleWithoutValue(input)
 	return buildStageTopEnvFix(
-		input, sf, priority,
+		input, sf, sm, priority,
 		`ENV BUNDLE_WITHOUT="`+value+`"`,
 		`Add ENV BUNDLE_WITHOUT="`+value+`" to exclude development gems from the production image`,
 		true,

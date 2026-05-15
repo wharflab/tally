@@ -286,7 +286,7 @@ func buildBundleDeploymentFix(
 		return nil
 	}
 	return buildStageTopEnvFix(
-		input, sf, priority,
+		input, sf, sm, priority,
 		`ENV BUNDLE_DEPLOYMENT="1"`,
 		`Add ENV BUNDLE_DEPLOYMENT="1" to enforce Bundler deployment-mode contract`,
 		true,

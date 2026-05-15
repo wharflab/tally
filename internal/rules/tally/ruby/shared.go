@@ -6,6 +6,7 @@ import (
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/sourcemap"
 	"github.com/wharflab/tally/internal/stagename"
 )
 
@@ -53,11 +54,17 @@ func forEachRubyStage(input rules.LintInput, visit rubyStageVisitor) {
 // This is the canonical placement used by the Rails 7.1 generator
 // template for `ENV BUNDLE_*` declarations.
 //
+// When sm is non-nil, the FROM end line is resolved via
+// `sm.ResolveEndLine` so a `FROM` with a backslash continuation
+// (`FROM \<NL>  ruby:3.3-slim`) inserts the ENV after the actual
+// closing line, not after the parser-reported one.
+//
 // Returns nil when the stage's location data is missing or the stage
 // index is out of range.
 func buildStageTopEnvFix(
 	input rules.LintInput,
 	sf *facts.StageFacts,
+	sm *sourcemap.SourceMap,
 	priority int,
 	envLine string,
 	description string,
@@ -73,7 +80,13 @@ func buildStageTopEnvFix(
 	if len(stage.Location) == 0 {
 		return nil
 	}
-	insertLine := stage.Location[len(stage.Location)-1].End.Line + 1
+	rawEnd := stage.Location[len(stage.Location)-1].End.Line
+	insertLine := rawEnd + 1
+	if sm != nil {
+		if resolved := sm.ResolveEndLine(rawEnd); resolved > 0 {
+			insertLine = resolved + 1
+		}
+	}
 	return &rules.SuggestedFix{
 		Description: description,
 		Safety:      rules.FixSafe,
