@@ -38,7 +38,7 @@ ARG production_network_max_binary_size="5242880"
 ARG protocol_contracts_count="7"
 
 ### 1.86.0-alpine3.21
-ARG rust_image_digest="sha256:661d708cc863ce32007cf46807a72062a80d2944a6fae9e0d83742d2e04d5375"
+ARG rust_image_digest="sha256:5b1e3484ddcd22a3738c0ec34a5e98bf19382eb295fb6db54295e62379119040"
 
 ### 1.91.0
 ARG rust_nightly_version="2025-08-10"
@@ -51,7 +51,7 @@ ARG test_network_build_profile_directory="test_nets_release"
 ARG test_network_max_binary_size="5242880"
 
 ### 1.88.0-alpine3.22
-ARG tooling_rust_image_digest="sha256:9dfaae478ecd298b6b5a039e1f2cc4fc040fc818a2de9aa78fa714dea036574d"
+ARG tooling_rust_image_digest="sha256:5b1e3484ddcd22a3738c0ec34a5e98bf19382eb295fb6db54295e62379119040"
 
 ################################################################################
 ##                           END : EDIT  HERE : END                           ##
