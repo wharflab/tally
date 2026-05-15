@@ -1,1 +1,0 @@
-note: 18 slow check(s) skipped (image not found)
