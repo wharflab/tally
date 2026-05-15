@@ -1,0 +1,81 @@
+---
+title: "tally/ruby/eol-ruby-version"
+description: "`FROM ruby:X.Y` references an end-of-life Ruby branch with no upstream security patches."
+---
+
+`FROM ruby:X.Y` references an end-of-life Ruby branch with no upstream security patches.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning (default) / Error (branch is past its retirement date) |
+| Category | Security |
+| Default | Enabled |
+| Auto-fix | Yes (`FixSuggestion`) |
+
+## Description
+
+The Ruby core team retires Ruby branches on a [published cadence](https://www.ruby-lang.org/en/downloads/branches/).
+Once a branch is retired, upstream stops publishing security patches — production images on retired
+branches accumulate unfixed CVEs over time.
+
+This rule maintains a curated end-of-life table:
+
+| Branch | Status | Retired |
+|--------|--------|---------|
+| 2.4    | EOL    | 2020-04-05 |
+| 2.5    | EOL    | 2021-03-31 |
+| 2.6    | EOL    | 2022-04-12 |
+| 2.7    | EOL    | 2023-03-31 |
+| 3.0    | EOL    | 2024-03-31 |
+| 3.1    | EOL    | 2025-03-31 |
+| 3.2 / 3.3 / 3.4 | Supported | — |
+
+A `FROM` line that resolves to one of the EOL branches fires the rule. Severity is `error` once the branch
+is past its retirement date (which all current EOL branches are), and `warning` for branches we can predict
+will retire soon.
+
+The rule recognizes only the official `ruby:*` image. Ruby derivatives (`jruby`, `truffleruby`,
+`phusion/passenger-ruby`) follow different release cadences and aren't covered by the upstream Ruby EOL
+table.
+
+The corpus shows **48 of 196 Dockerfiles still pinned to Ruby 2.x** and **15 more pinned to 3.0/3.1**.
+This rule's job is to catch them.
+
+### Context-aware refinement
+
+When tally is invoked with `--context`, the rule consults the project's `.ruby-version`,
+`.tool-versions`, or `Gemfile.lock`'s `RUBY VERSION` block to resolve ARG-templated bases. A Dockerfile that
+looks fine on the surface (`FROM ruby:${RUBY_VERSION}-slim`) but resolves against `.ruby-version: 2.7.5`
+will correctly fire as EOL.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:2.7-slim
+RUN bundle install
+```
+
+### After
+
+```dockerfile
+FROM ruby:3.4-slim
+RUN bundle install
+```
+
+The fix preserves the variant suffix (`-slim`, `-alpine`, `-bookworm`, etc.). For ARG-templated bases the
+fix is suppressed — the user has to decide whether to bump the ARG default or rewrite the FROM directly.
+
+## Auto-fix
+
+`FixSuggestion`. Rewrites the `FROM ruby:X.Y[-variant]` reference to use the most recent supported branch.
+
+The fix is `FixSuggestion` (not `FixSafe`) because major version bumps may require gem updates. Run
+`bundle update` and your test suite after applying.
+
+## References
+
+- [Ruby maintenance branches](https://www.ruby-lang.org/en/downloads/branches/) — upstream support matrix.
+- [Ruby 3.3 release notes](https://www.ruby-lang.org/en/news/2023/12/25/ruby-3-3-0-released/) — context for
+  the current supported branches.

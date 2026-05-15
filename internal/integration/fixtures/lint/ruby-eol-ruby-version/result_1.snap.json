@@ -1,0 +1,142 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-eol-ruby-version/Dockerfile",
+      "violations": [
+        {
+          "detail": "Ruby 2.7 is past upstream end-of-life — the upstream Ruby team no longer publishes security patches as of 2023-03-31. Production images on this branch will accumulate unfixed CVEs over time. Migrate to a currently-supported branch (Ruby 3.4, Ruby 3.3, Ruby 3.2) — see https://www.ruby-lang.org/en/downloads/branches/ for the upstream support matrix.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/eol-ruby-version/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/ruby-eol-ruby-version/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "Base image uses an end-of-life Ruby version with no upstream security patches",
+          "rule": "tally/ruby/eol-ruby-version",
+          "severity": "error",
+          "sourceCode": "FROM ruby:2.7-slim AS app-2x",
+          "suggestedFix": {
+            "description": "Bump the Ruby base image to a supported branch (3.4)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 19,
+                    "line": 2
+                  },
+                  "file": "fixtures/lint/ruby-eol-ruby-version/Dockerfile",
+                  "start": {
+                    "column": 6,
+                    "line": 2
+                  }
+                },
+                "newText": "ruby:3.4-slim"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Ruby 3.0 is past upstream end-of-life — the upstream Ruby team no longer publishes security patches as of 2024-03-31. Production images on this branch will accumulate unfixed CVEs over time. Migrate to a currently-supported branch (Ruby 3.4, Ruby 3.3, Ruby 3.2) — see https://www.ruby-lang.org/en/downloads/branches/ for the upstream support matrix.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/eol-ruby-version/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "fixtures/lint/ruby-eol-ruby-version/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "Base image uses an end-of-life Ruby version with no upstream security patches",
+          "rule": "tally/ruby/eol-ruby-version",
+          "severity": "error",
+          "sourceCode": "FROM ruby:3.0 AS app-30",
+          "suggestedFix": {
+            "description": "Bump the Ruby base image to a supported branch (3.4)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 14,
+                    "line": 6
+                  },
+                  "file": "fixtures/lint/ruby-eol-ruby-version/Dockerfile",
+                  "start": {
+                    "column": 6,
+                    "line": 6
+                  }
+                },
+                "newText": "ruby:3.4"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Ruby 3.1 is past upstream end-of-life — the upstream Ruby team no longer publishes security patches as of 2025-03-31. Production images on this branch will accumulate unfixed CVEs over time. Migrate to a currently-supported branch (Ruby 3.4, Ruby 3.3, Ruby 3.2) — see https://www.ruby-lang.org/en/downloads/branches/ for the upstream support matrix.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/eol-ruby-version/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "fixtures/lint/ruby-eol-ruby-version/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "Base image uses an end-of-life Ruby version with no upstream security patches",
+          "rule": "tally/ruby/eol-ruby-version",
+          "severity": "error",
+          "sourceCode": "FROM ruby:3.1.6 AS app-31",
+          "suggestedFix": {
+            "description": "Bump the Ruby base image to a supported branch (3.4)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 16,
+                    "line": 10
+                  },
+                  "file": "fixtures/lint/ruby-eol-ruby-version/Dockerfile",
+                  "start": {
+                    "column": 6,
+                    "line": 10
+                  }
+                },
+                "newText": "ruby:3.4.6"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 3,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}
