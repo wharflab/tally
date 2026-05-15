@@ -67,6 +67,22 @@ RUN bundle install
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "ENV BUNDLE_WITHOUT after the install does NOT suppress (Docker ENV is forward-only)",
+			Content: `FROM ruby:3.3-slim
+RUN bundle install
+ENV BUNDLE_WITHOUT="development"
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "bundle config set in a later RUN does NOT suppress an earlier install",
+			Content: `FROM ruby:3.3-slim
+RUN bundle install
+RUN bundle config set --local without development
+`,
+			WantViolations: 1,
+		},
 		// --- Compliance: BUNDLE_WITHOUT contains "development" ---
 		{
 			Name: "ENV BUNDLE_WITHOUT=development suppresses",

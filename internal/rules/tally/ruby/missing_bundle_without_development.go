@@ -90,9 +90,6 @@ func (r *MissingBundleWithoutDevelopmentRule) Check(input rules.LintInput) []rul
 		if !stageLooksProduction(input, sf) {
 			continue
 		}
-		if stageHasBundleWithoutDevelopmentSignal(sf) {
-			continue
-		}
 		violations = append(violations, r.checkStage(input, sf, sm, meta)...)
 	}
 	return violations
@@ -104,12 +101,35 @@ func (r *MissingBundleWithoutDevelopmentRule) checkStage(
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
 ) []rules.Violation {
+	// Compliance is evaluated at each `bundle install` invocation, not
+	// at stage end. Docker `ENV` only affects subsequent instructions, and
+	// `bundle config set` only affects subsequent installs — so an
+	// `ENV BUNDLE_WITHOUT=development` (or `bundle config set ... without
+	// development`) that lands in a RUN *after* the install is too late.
+	configBeforeIdx := false
 	for _, runFacts := range sf.Runs {
 		if runFacts == nil {
 			continue
 		}
+		// Check whether *this* RUN already runs `bundle config set without
+		// development`. The signal fires for any later `bundle install` in
+		// the same stage, including one in a later RUN.
+		if !configBeforeIdx && runHasBundleConfigSetWithoutDevelopment(runFacts) {
+			configBeforeIdx = true
+		}
 		install := findFirstBundleInstall(runFacts)
 		if install == nil {
+			continue
+		}
+		// `runFacts.Env.Bindings` is the env *visible to this RUN*, so a
+		// later `ENV BUNDLE_WITHOUT=development` is correctly invisible
+		// here. Likewise `configBeforeIdx` is only true when an earlier RUN
+		// (or the same RUN, before the install on the parsed-command level)
+		// configured the exclusion.
+		if envFactsContainBundleWithoutDevelopmentSignal(runFacts.Env) {
+			continue
+		}
+		if configBeforeIdx || runConfiguresBundleWithoutDevelopmentBeforeInstall(runFacts, *install) {
 			continue
 		}
 		loc := bundleInstallViolationLocation(input.File, runFacts, *install, sm)
@@ -188,36 +208,73 @@ func envValueEqualsProduction(value string) bool {
 	return strings.EqualFold(strings.TrimSpace(value), "production")
 }
 
-// stageHasBundleWithoutDevelopmentSignal reports whether the stage already
-// carries an env binding (or a `bundle config set` invocation) that excludes
-// the `development` gem group. Compliance is recognized when:
-//
-//   - `BUNDLE_WITHOUT` is set (via ENV) and contains "development"
-//     (case-insensitive substring), or
-//   - `BUNDLE_ONLY` is set (via ENV) and contains "production" (the Bundler
-//     2.5+ inverse selector that scopes the install to a positive set of
-//     groups), or
-//   - any RUN in this stage invokes `bundle config set [--local|--global] without ...`
-//     with a value containing "development".
-func stageHasBundleWithoutDevelopmentSignal(sf *facts.StageFacts) bool {
-	if sf == nil {
-		return false
-	}
-	if envValueContainsToken(envBoundValue(sf, "BUNDLE_WITHOUT"), developmentGroupToken) {
-		return true
-	}
-	if envValueContainsToken(envBoundValue(sf, "BUNDLE_ONLY"), productionOnlyToken) {
-		return true
-	}
-	for _, runFacts := range sf.Runs {
-		if runFacts == nil {
-			continue
+// envFactsContainBundleWithoutDevelopmentSignal reports whether the env
+// snapshot at a RUN site already excludes the development group via
+// `BUNDLE_WITHOUT` or `BUNDLE_ONLY`. Unlike a stage-final check, this uses
+// the env state *visible to this RUN* — so an `ENV BUNDLE_WITHOUT=...` that
+// lands in a later RUN does not retroactively make the earlier install
+// compliant.
+func envFactsContainBundleWithoutDevelopmentSignal(env facts.EnvFacts) bool {
+	if envValueContainsToken(env.Values["BUNDLE_WITHOUT"], developmentGroupToken) {
+		// Only count the value when it was bound by an `ENV` instruction
+		// (not by a meta-ARG or other build-time-only mechanism).
+		if _, ok := env.Bindings["BUNDLE_WITHOUT"]; ok {
+			return true
 		}
-		if slices.ContainsFunc(runFacts.CommandInfos, bundleConfigSetExcludesDevelopment) {
+	}
+	if envValueContainsToken(env.Values["BUNDLE_ONLY"], productionOnlyToken) {
+		if _, ok := env.Bindings["BUNDLE_ONLY"]; ok {
 			return true
 		}
 	}
 	return false
+}
+
+// runHasBundleConfigSetWithoutDevelopment reports whether the RUN runs
+// `bundle config set [--local|--global] without ...development...` at all.
+// Used to mark the RUN's effect as "configured exclusion" so any subsequent
+// `bundle install` in the same stage (in this RUN or a later one) is
+// compliant.
+func runHasBundleConfigSetWithoutDevelopment(runFacts *facts.RunFacts) bool {
+	if runFacts == nil {
+		return false
+	}
+	return slices.ContainsFunc(runFacts.CommandInfos, bundleConfigSetExcludesDevelopment)
+}
+
+// runConfiguresBundleWithoutDevelopmentBeforeInstall reports whether the
+// same RUN invokes `bundle config set ... without ... development` at a
+// command position *before* the `bundle install`. The position check uses
+// the parsed CommandInfo source ranges — `bundle config set` and
+// `bundle install` chained with `&&` in the same RUN both yield ordered
+// CommandInfo entries.
+func runConfiguresBundleWithoutDevelopmentBeforeInstall(
+	runFacts *facts.RunFacts,
+	install shell.CommandInfo,
+) bool {
+	if runFacts == nil {
+		return false
+	}
+	for _, ci := range runFacts.CommandInfos {
+		if !bundleConfigSetExcludesDevelopment(ci) {
+			continue
+		}
+		if commandPrecedes(ci, install) {
+			return true
+		}
+	}
+	return false
+}
+
+// commandPrecedes reports whether command `a` appears before command `b`
+// in the parsed source script. Position comparison uses (Line, StartCol)
+// from each CommandInfo. Used to enforce ordering on shell-level command
+// chains within a single RUN.
+func commandPrecedes(a, b shell.CommandInfo) bool {
+	if a.Line != b.Line {
+		return a.Line < b.Line
+	}
+	return a.StartCol < b.StartCol
 }
 
 // envValueContainsToken reports whether a Bundler env value contains the
