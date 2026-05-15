@@ -41,15 +41,23 @@ var gemfileRubyRe = regexp.MustCompile(`(?m)^\s*ruby\s+['"]([^'"]+)['"]`)
 // gem option hashes.
 var gemfileSourceRe = regexp.MustCompile(`(?m)^\s*source\s+['"]([^'"]+)['"]`)
 
-// gemfileGemHeadRe matches the start of a `gem "name"` declaration and
-// captures the remainder of that line. The remainder is then scanned for
-// git: or github: options after joining any trailing continuation lines.
-var gemfileGemHeadRe = regexp.MustCompile(`(?m)^\s*gem\s+['"]([^'"]+)['"](.*)$`)
+// gemfileGemHeadRe matches the start of a `gem "name"` declaration in either
+// the bare-call form (`gem "name", ...`) or the parenthesized DSL form
+// (`gem("name", ...)`). The remainder of the head line is captured for
+// option-scanning after joining any trailing continuation lines.
+var gemfileGemHeadRe = regexp.MustCompile(`(?m)^\s*gem\s*[\s(]\s*['"]([^'"]+)['"](.*)$`)
 
 // gemfileGroupRe matches a `group :a, :b do` block opener and captures the
 // comma-separated symbol list (`:a, :b`). The capture is the text between
 // `group` and the final ` do` on the same line.
 var gemfileGroupRe = regexp.MustCompile(`(?m)^\s*group\s+(.+?)\s+do\b`)
+
+// gitBlockOpenerRe matches the start of a Bundler git/git_source block
+// (`git "URL" do`, `git_source(:foo) do`). The pattern is anchored to a
+// single line; callers feed it one trimmed line at a time. All gem entries
+// inside the block inherit the git source even when they don't carry an
+// inline `git:`/`github:` option, so we mark them as git gems.
+var gitBlockOpenerRe = regexp.MustCompile(`^(?:git|git_source)\b.*\bdo(?:\s*\|[^|]*\|)?\s*$`)
 
 // gitOptionRe and githubOptionRe detect whether a gem entry's option list
 // pins it to a git URL. Both `git: "..."`/`github: "..."` (Ruby 1.9 hash
@@ -80,13 +88,16 @@ func ParseGemfile(content []byte) *GemfileFacts {
 		facts.Sources = append(facts.Sources, m[1])
 	}
 
+	gitBlockSpans := findGitBlockSpans(text)
 	seenGit := map[string]bool{}
 	for _, m := range gemfileGemHeadRe.FindAllStringSubmatchIndex(text, -1) {
 		// m[0]/m[1] = whole-match span, m[2]/m[3] = name span,
 		// m[4]/m[5] = "rest of head line" span.
 		name := text[m[2]:m[3]]
+		gemStart := m[0]
 		rest := joinGemDeclaration(text, m[4], m[5])
-		if hasGitOrGithubOption(rest) && !seenGit[name] {
+		inGitBlock := offsetInsideAnySpan(gemStart, gitBlockSpans)
+		if (inGitBlock || hasGitOrGithubOption(rest)) && !seenGit[name] {
 			seenGit[name] = true
 			facts.GitGems = append(facts.GitGems, name)
 		}
@@ -219,6 +230,93 @@ func continuesGemDeclaration(rest string) bool {
 	last := stripped[len(stripped)-1]
 	return last == ',' || last == '\\'
 }
+
+// findGitBlockSpans returns half-open [start, end) byte ranges covering the
+// body of every `git "URL" do ... end` (and `git_source(...) do ... end`)
+// block in text. The implementation is line-oriented: any line whose stripped
+// form looks like a Ruby block opener (ends in `do` or `do |...|`) increments
+// the depth, and any line whose stripped form is a bare `end` decrements it.
+// This is good enough for the formatting styles real Gemfiles use.
+func findGitBlockSpans(text string) [][2]int {
+	type openBlock struct {
+		bodyStart int
+		isGit     bool
+	}
+
+	var (
+		spans     [][2]int
+		stack     []openBlock
+		lineStart int
+	)
+	for lineStart < len(text) {
+		nl := indexByteFrom(text, '\n', lineStart)
+		lineEnd := nl
+		if lineEnd < 0 {
+			lineEnd = len(text)
+		}
+		line := text[lineStart:lineEnd]
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case isGitBlockOpenerLine(trimmed):
+			stack = append(stack, openBlock{bodyStart: lineEnd, isGit: true})
+		case isBlockOpenerLine(trimmed):
+			stack = append(stack, openBlock{bodyStart: lineEnd, isGit: false})
+		case isBlockCloserLine(trimmed):
+			if n := len(stack); n > 0 {
+				top := stack[n-1]
+				stack = stack[:n-1]
+				if top.isGit {
+					spans = append(spans, [2]int{top.bodyStart, lineStart})
+				}
+			}
+		}
+		if nl < 0 {
+			break
+		}
+		lineStart = nl + 1
+	}
+	// Any unclosed git blocks (malformed Gemfile) extend to EOF.
+	for _, top := range stack {
+		if top.isGit {
+			spans = append(spans, [2]int{top.bodyStart, len(text)})
+		}
+	}
+	return spans
+}
+
+func isGitBlockOpenerLine(trimmed string) bool {
+	return gitBlockOpenerRe.MatchString(trimmed)
+}
+
+func isBlockOpenerLine(trimmed string) bool {
+	if trimmed == "" {
+		return false
+	}
+	// We only treat lines whose final non-whitespace token is `do` (or
+	// `do |arg|`) as block openers. Inline `do` tokens inside strings or
+	// long expressions are out of scope and acceptably rare in Gemfiles.
+	return blockOpenerLineRe.MatchString(trimmed)
+}
+
+func isBlockCloserLine(trimmed string) bool {
+	return trimmed == "end"
+}
+
+// offsetInsideAnySpan reports whether offset falls within any of the supplied
+// half-open spans.
+func offsetInsideAnySpan(offset int, spans [][2]int) bool {
+	for _, span := range spans {
+		if offset >= span[0] && offset < span[1] {
+			return true
+		}
+	}
+	return false
+}
+
+// blockOpenerLineRe matches a line whose syntactic tail is a Ruby block
+// opener (`... do` or `... do |args|`). Line-anchored so opening tokens
+// inside string literals on other lines do not match.
+var blockOpenerLineRe = regexp.MustCompile(`\bdo(?:\s*\|[^|]*\|)?\s*$`)
 
 // parseGroupSymbols extracts the list of group symbols from the captured
 // portion of `group :a, :b do`. Whitespace and the leading colon are stripped.

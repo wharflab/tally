@@ -170,6 +170,63 @@ gem "regular-version", "~> 5.0"
 	}
 }
 
+func TestParseGemfile_ParenthesizedGemCalls(t *testing.T) {
+	t.Parallel()
+
+	const content = `source "https://rubygems.org"
+
+gem("rails", "~> 8.0")
+gem('paren-git', git: "https://example.com/paren-git.git")
+gem ( "spaced-paren", github: "owner/spaced-paren" )
+gem "regular", git: "https://example.com/regular.git"
+`
+	gem := ParseGemfile([]byte(content))
+	if gem == nil {
+		t.Fatal("ParseGemfile returned nil")
+	}
+	wantGit := []string{"paren-git", "spaced-paren", "regular"}
+	if !slices.Equal(gem.GitGems, wantGit) {
+		t.Errorf("GitGems = %v, want %v", gem.GitGems, wantGit)
+	}
+}
+
+func TestParseGemfile_GitBlockGems(t *testing.T) {
+	t.Parallel()
+
+	const content = `source "https://rubygems.org"
+
+git "https://github.com/example/inside-block.git" do
+  gem "block-a"
+  gem "block-b", "~> 1.0"
+end
+
+git_source(:internal) do |repo|
+  gem "git-source-a", "owner/repo"
+end
+
+# This gem is outside any git block and has no git: option.
+gem "not-git", "~> 5.0"
+
+# Inline git: option still works.
+gem "inline-git", git: "https://example.com/inline.git"
+
+group :test do
+  gem "test-only"
+end
+`
+	gem := ParseGemfile([]byte(content))
+	if gem == nil {
+		t.Fatal("ParseGemfile returned nil")
+	}
+	wantGit := []string{"block-a", "block-b", "git-source-a", "inline-git"}
+	if !slices.Equal(gem.GitGems, wantGit) {
+		t.Errorf("GitGems = %v, want %v", gem.GitGems, wantGit)
+	}
+	if !gem.HasTestGroup {
+		t.Errorf("HasTestGroup = false, want true")
+	}
+}
+
 func TestParseGroupSymbols(t *testing.T) {
 	t.Parallel()
 
