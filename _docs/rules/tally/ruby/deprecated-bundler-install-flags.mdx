@@ -1,0 +1,73 @@
+---
+title: "tally/ruby/deprecated-bundler-install-flags"
+description: "`bundle install` uses a flag deprecated in Bundler 2.x (--without, --deployment, --path)."
+---
+
+`bundle install` uses one of the flags Bundler 2.x deprecated in favor of `BUNDLE_*` env vars and
+`bundle config set`.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | `FixSafe` for `--without`/`--deployment`, `FixSuggestion` for `--path` |
+
+## Description
+
+Bundler 2.x deprecated three `bundle install` flags in favor of `BUNDLE_*` env vars and the
+`bundle config set` command:
+
+| Deprecated flag | Recommended replacement |
+|-----------------|-------------------------|
+| `--without <groups>` | `ENV BUNDLE_WITHOUT="<groups>"` |
+| `--deployment` | `ENV BUNDLE_DEPLOYMENT="1"` |
+| `--path <dir>` | `ENV BUNDLE_PATH="<dir>"` |
+
+The flags still work but emit a deprecation notice on every CI run, and are slated for removal in Bundler 3.
+
+The corpus shows only a handful of files using these (3 with `--without`, 1 with `--deployment`), but they
+keep showing up in copy-pasted Dockerfile snippets from blog posts written before Bundler 2's release.
+
+This rule fires on each deprecated flag in a `bundle install` invocation. Multiple flags in the same
+command produce separate violations.
+
+Stages explicitly named `dev`/`development`/`test`/`testing`/`ci`/`debug` are skipped.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+RUN bundle install --without development --deployment
+```
+
+### After
+
+```dockerfile
+FROM ruby:3.3-slim
+ENV BUNDLE_WITHOUT="development"
+ENV BUNDLE_DEPLOYMENT="1"
+RUN bundle install
+```
+
+The env-var form is functionally equivalent (and the Rails generator's preferred shape) — and it survives
+across multiple `bundle install` invocations in the same stage.
+
+## Auto-fix
+
+- `--without <groups>` → `FixSafe`. The env-var form is a strict equivalent.
+- `--deployment` → `FixSafe`. Same — `BUNDLE_DEPLOYMENT="1"` is the env-var form of `--deployment`.
+- `--path <dir>` → `FixSuggestion`. The user may have downstream `BUNDLE_PATH` expectations (other RUNs
+  reading from the path) that the env-var version may interact with differently.
+
+The fix is non-edit (description-only) — rewriting the RUN's flag and inserting an ENV at the right
+location is too easy to get wrong on multi-line `RUN` chains. The user applies the rewrite manually.
+
+## References
+
+- [Bundler 2 upgrade guide](https://bundler.io/guides/bundler_2_upgrade.html) — full list of deprecated
+  flags and their replacements.
+- [Bundler `bundle config` documentation](https://bundler.io/v2.5/man/bundle-config.1.html) — supported
+  configuration mechanism for Bundler 2.x.
