@@ -97,7 +97,12 @@ func (r *PreferGemfileBindMountsRule) Check(input rules.LintInput) []rules.Viola
 		if copyCmd == nil {
 			continue
 		}
-		if !stageHasBundleInstall(sf) {
+		// Only fire when bundle install runs AFTER the COPY in source
+		// order. A `bundle install` before any Gemfile COPY (or a COPY
+		// that exists for another purpose, e.g. shipping Gemfile into
+		// a final-stage runtime that doesn't run install) is not the
+		// pattern this rule targets.
+		if !stageHasBundleInstallAfter(sf, copyStartLine(copyCmd)) {
 			continue
 		}
 
@@ -115,10 +120,34 @@ func (r *PreferGemfileBindMountsRule) Check(input rules.LintInput) []rules.Viola
 				IsPreferred: false,
 			})
 		violations = append(violations, v)
-		// Report once per stage.
-		break
+		// Report once per stage; continue scanning subsequent stages
+		// in case a multi-stage Dockerfile has multiple Ruby stages
+		// with the same pattern.
 	}
 	return violations
+}
+
+// stageHasBundleInstallAfter reports whether any RUN at-or-after the
+// supplied source line contains `bundle install`. Used to enforce the
+// ordering: the COPY must precede the install.
+func stageHasBundleInstallAfter(sf *facts.StageFacts, line int) bool {
+	for _, runFacts := range sf.Runs {
+		if runFacts == nil || runFacts.Run == nil {
+			continue
+		}
+		runRanges := runFacts.Run.Location()
+		if len(runRanges) == 0 {
+			continue
+		}
+		runLine := runRanges[0].Start.Line
+		if runLine < line {
+			continue
+		}
+		if slices.ContainsFunc(runFacts.CommandInfos, isBundleInstall) {
+			return true
+		}
+	}
+	return false
 }
 
 func preferGemfileBindMountsDetail() string {
@@ -169,20 +198,6 @@ func copyMatchesGemfileManifests(cmd *instructions.CopyCommand) bool {
 		}
 	}
 	return hasGemfile && hasLock
-}
-
-// stageHasBundleInstall reports whether any RUN in the stage runs
-// `bundle install`.
-func stageHasBundleInstall(sf *facts.StageFacts) bool {
-	for _, runFacts := range sf.Runs {
-		if runFacts == nil {
-			continue
-		}
-		if slices.ContainsFunc(runFacts.CommandInfos, isBundleInstall) {
-			return true
-		}
-	}
-	return false
 }
 
 func init() {
