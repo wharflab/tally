@@ -290,6 +290,69 @@ func prepareMockRegistry(tmpDir string) (string, error) {
 		})
 	}
 
+	// Fixture base-image stubs. These are minimal images pushed under the
+	// same repo path the fixture uses, so when registries.conf rewrites e.g.
+	// mcr.microsoft.com/powershell:7.4-ubuntu-22.04 →
+	// <mock>/powershell:7.4-ubuntu-22.04, the resolver finds something
+	// instead of going to the live MCR / quay / public ECR.
+	//
+	// Each stub records the platform the upstream image actually has so
+	// platform-aware rules (buildkit/InvalidBaseImagePlatform,
+	// tally/platform-mismatch) see the same OS/Arch they'd see live.
+	// Mocking Windows-only images as linux/arm64 would mask their true
+	// platform and silently make platform checks pass on a windowsservercore
+	// fixture — so windowsservercore / nanoserver / windows-tagged images
+	// get pushed as windows/amd64 here.
+	//
+	// Slow-check rules don't read base-image env beyond PATH (telemetry
+	// inheritance only applies to in-Dockerfile stage refs, not
+	// registry-pulled images), so the stubs intentionally don't try to
+	// reproduce upstream image config.
+	fixtureBaseImages := []struct {
+		repo, tag string
+		os, arch  string
+	}{
+		// mcr.microsoft.com/* — Linux-tagged powershell variants.
+		{repo: "powershell", tag: "6.2.1-alpine-3.8", os: "linux", arch: "arm64"},
+		{repo: "powershell", tag: "7.4-ubuntu-22.04", os: "linux", arch: "arm64"},
+		{repo: "powershell", tag: "ubuntu-22.04", os: "linux", arch: "arm64"},
+		// mcr.microsoft.com/* — Windows-only images. Upstream serves these
+		// as windows/amd64 only; preserve that here so platform-aware rules
+		// see the truthful mismatch when DOCKER_DEFAULT_PLATFORM=linux/arm64.
+		{repo: "windows/servercore", tag: "ltsc2022", os: "windows", arch: "amd64"},
+		{repo: "windows/servercore", tag: "ltsc2025", os: "windows", arch: "amd64"},
+		{repo: "windows/servercore/iis", tag: "windowsservercore-ltsc2019", os: "windows", arch: "amd64"},
+		{repo: "dotnet/framework/sdk", tag: "4.8-windowsservercore-ltsc2019", os: "windows", arch: "amd64"},
+		// dotnet/sdk:8.0 is a Linux multi-arch tag upstream.
+		{repo: "dotnet/sdk", tag: "8.0", os: "linux", arch: "arm64"},
+		// quay.io/*
+		{repo: "prometheus/node-exporter", tag: "latest", os: "linux", arch: "arm64"},
+		// public.ecr.aws/*
+		{repo: "lambda/python", tag: "3.12", os: "linux", arch: "arm64"},
+		// docker.io non-library namespaces (redirected via the docker.io prefix).
+		// teeks99/msvc-win is a Windows VS Build Tools image.
+		{repo: "teeks99/msvc-win", tag: "14.0", os: "windows", arch: "amd64"},
+		{repo: "pytorch/pytorch", tag: "2.1.0-cuda12.1-cudnn8-devel", os: "linux", arch: "arm64"},
+		{repo: "openresty/openresty", tag: "alpine", os: "linux", arch: "arm64"},
+		// dhi.io/*
+		{repo: "debian-base", tag: "trixie-dev", os: "linux", arch: "arm64"},
+	}
+	for _, img := range fixtureBaseImages {
+		jobs = append(jobs, imageJob{
+			label: fmt.Sprintf("add fixture stub %s:%s (%s/%s)", img.repo, img.tag, img.os, img.arch),
+			run: func() error {
+				_, err := mockRegistry.AddImage(testutil.ImageOpts{
+					Repo: img.repo,
+					Tag:  img.tag,
+					OS:   img.os,
+					Arch: img.arch,
+					Env:  map[string]string{"PATH": "/usr/local/bin:/usr/bin:/bin"},
+				})
+				return err
+			},
+		})
+	}
+
 	var wg sync.WaitGroup
 	errs := make([]error, len(jobs))
 	for i, job := range jobs {
@@ -309,11 +372,22 @@ func prepareMockRegistry(tmpDir string) (string, error) {
 		}
 	}
 
-	// Write registries.conf redirecting docker.io to the mock server. The
-	// caller is responsible for publishing it via os.Setenv (see
-	// finalizeMockRegistry) so multiple goroutines don't race on process
-	// state during TestMain setup.
-	confPath, err := mockRegistry.WriteRegistriesConf(tmpDir, "docker.io")
+	// Write registries.conf redirecting every registry our fixtures touch
+	// to the mock server. The caller is responsible for publishing it via
+	// os.Setenv (see finalizeMockRegistry) so multiple goroutines don't
+	// race on process state during TestMain setup.
+	//
+	// Without these non-docker.io entries, slow-check resolutions for
+	// fixtures using mcr.microsoft.com / quay.io / public.ecr.aws / dhi.io
+	// would silently leak to live registries — slowing tests down,
+	// flaking on network blips, and breaking offline runs.
+	confPath, err := mockRegistry.WriteRegistriesConf(tmpDir,
+		"docker.io",
+		"mcr.microsoft.com",
+		"quay.io",
+		"public.ecr.aws",
+		"dhi.io",
+	)
 	if err != nil {
 		mockRegistry.Close()
 		return "", fmt.Errorf("create registries.conf: %w", err)
