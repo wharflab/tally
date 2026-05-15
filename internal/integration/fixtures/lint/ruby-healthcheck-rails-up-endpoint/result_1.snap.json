@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-healthcheck-rails-up-endpoint/Dockerfile",
+      "violations": [
+        {
+          "detail": "Rails 7.1+ mounts `Rails::HealthController` at `/up` by default. The Ruby stdlib's Net::HTTP (already in the image) is the cheapest way to probe it — no extra apt install for `curl`. Add a HEALTHCHECK that calls `/up` via `ruby -rnet/http -e ...`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/healthcheck-rails-up-endpoint/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/ruby-healthcheck-rails-up-endpoint/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "Rails runtime image lacks HEALTHCHECK or uses curl/wget instead of Ruby stdlib Net::HTTP",
+          "rule": "tally/ruby/healthcheck-rails-up-endpoint",
+          "severity": "info",
+          "sourceCode": "FROM ruby:3.3-slim",
+          "suggestedFix": {
+            "description": "Add a Ruby-native HEALTHCHECK against /up: HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD [\"ruby\", \"-rnet/http\", \"-e\", \"exit Net::HTTP.get_response(URI('http://127.0.0.1:3000/up')).is_a?(Net::HTTPSuccess) ? 0 : 1\"]. Net::HTTP is in the Ruby stdlib so no extra packages are needed.",
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

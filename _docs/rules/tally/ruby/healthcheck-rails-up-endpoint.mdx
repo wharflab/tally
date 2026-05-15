@@ -1,0 +1,103 @@
+---
+title: "tally/ruby/healthcheck-rails-up-endpoint"
+description: "Rails runtime image lacks HEALTHCHECK or uses curl/wget instead of Ruby stdlib Net::HTTP."
+---
+
+Rails 7.1+ ships a `/up` health endpoint by default. The Ruby stdlib's `Net::HTTP` is already in the image —
+no extra `apt-get install curl` needed.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Correctness |
+| Default | Enabled (advisory) |
+| Auto-fix | `FixSuggestion` (no-edit) |
+
+## Description
+
+Rails 7.1 added `Rails::HealthController` mounted at `/up` by default. It returns `200` if the app booted
+cleanly, `500` otherwise — exactly the right shape for a Docker `HEALTHCHECK`. Almost no Rails Dockerfile
+uses it, and the few that do reach for `curl`, which forces an extra package install on `ruby:*-slim` and
+`ruby:*-alpine` bases (where `curl` is not present by default).
+
+This rule has two flavors:
+
+1. **Missing `HEALTHCHECK` on a Rails 7.1+ runtime stage** — recommend adding the canonical Ruby-native one.
+2. **`HEALTHCHECK` present but uses `curl` or `wget`** — suggest replacing with the Ruby stdlib equivalent.
+   Especially when the same Dockerfile installs `curl` only because the healthcheck needs it (the corpus
+   shows this exact pattern).
+
+The corpus shows:
+
+- 6 of 196 use `HEALTHCHECK` at all.
+- 2 of 196 target `/up`.
+- Both `/up` healthchecks use `curl` against a `ruby:*-slim` base — both then need
+  `apt-get install ... curl ...` upstream of that line.
+- 0 of 196 use a Ruby-native healthcheck.
+
+This rule fires when:
+
+- The final stage is a Rails app runtime (Ruby base + ENTRYPOINT/CMD references `rails`/`puma`/`unicorn`/etc.).
+- Variant 1: no `HEALTHCHECK` at all.
+- Variant 2: `HEALTHCHECK` present and the command starts with `curl` or `wget`.
+
+`HEALTHCHECK NONE` (the explicit "I have an external orchestrator" signal) is recognized as a deliberate
+opt-out and suppresses the rule.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+COPY . .
+CMD ["bin/rails", "server"]
+```
+
+Or with curl:
+
+```dockerfile
+FROM ruby:3.3-slim
+RUN apt-get update && apt-get install -y curl
+COPY . .
+HEALTHCHECK CMD curl -fsS http://127.0.0.1:3000/up || exit 1
+CMD ["bin/rails", "server"]
+```
+
+### After
+
+The Ruby-native form uses the stdlib `Net::HTTP` (already in the image), targets `/up` (the Rails default),
+and uses the JSON exec form so the command runs as `execve` rather than under `/bin/sh -c`:
+
+```dockerfile
+FROM ruby:3.3-slim
+COPY . .
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["ruby", "-rnet/http", "-e", "exit Net::HTTP.get_response(URI('http://127.0.0.1:3000/up')).is_a?(Net::HTTPSuccess) ? 0 : 1"]
+CMD ["bin/rails", "server"]
+```
+
+Why this exact shape:
+
+- `ruby -rnet/http -e` keeps the entire HTTP client in the image's existing Ruby interpreter — no `curl`,
+  no `wget`, no extra layer.
+- `Net::HTTP.get_response(URI('...'))` returns a `Net::HTTPResponse` whose subclass implements
+  `Net::HTTPSuccess` for any 2xx — so the check succeeds for `/up`'s `200 OK` and correctly fails on
+  `500` (which is what `Rails::HealthController` returns when the boot fails).
+- Using `127.0.0.1` rather than `localhost` avoids one DNS lookup per probe and is robust against
+  IPv6-only `localhost` weirdness inside containers.
+- The JSON exec form (`["ruby", ...]`) means Docker runs the command directly via `execve` rather than
+  spawning `/bin/sh -c`. This matters more for `HEALTHCHECK` than `CMD` because healthchecks run on every
+  interval — the per-invocation shell startup adds up.
+
+## Auto-fix
+
+`FixSuggestion` (no-edit). Description names the canonical Ruby-native form. Variant 2 (curl/wget present)
+also notes that the user can drop the `apt-get install curl` line if it was added solely for the
+healthcheck.
+
+## References
+
+- [Rails 7.1 release notes — health endpoint](https://guides.rubyonrails.org/7_1_release_notes.html#actioncontroller-rails-healthcontroller).
+- [Net::HTTP stdlib reference](https://docs.ruby-lang.org/en/3.4/Net/HTTP.html).
+- [Docker HEALTHCHECK documentation](https://docs.docker.com/reference/dockerfile/#healthcheck).
