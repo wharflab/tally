@@ -52,19 +52,15 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 		registryErr     error
 		registryTmpConf string
 	)
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		binErr = buildIntegrationBinary(tmpDir)
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		acpErr = buildIntegrationAcpAgent(tmpDir)
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		registryTmpConf, registryErr = prepareMockRegistry(tmpDir)
-	}()
+	})
 	wg.Wait()
 
 	if binErr != nil {
@@ -356,13 +352,11 @@ func prepareMockRegistry(tmpDir string) (string, error) {
 	var wg sync.WaitGroup
 	errs := make([]error, len(jobs))
 	for i, job := range jobs {
-		wg.Add(1)
-		go func(i int, job imageJob) {
-			defer wg.Done()
+		wg.Go(func() {
 			if err := job.run(); err != nil {
 				errs[i] = fmt.Errorf("%s: %w", job.label, err)
 			}
-		}(i, job)
+		})
 	}
 	wg.Wait()
 	for _, err := range errs {
