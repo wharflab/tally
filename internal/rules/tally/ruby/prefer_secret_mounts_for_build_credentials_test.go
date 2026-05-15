@@ -130,5 +130,28 @@ RUN bundle install
 `,
 			WantViolations: 2,
 		},
+		// --- Bundler config-key disambiguation (codex P2) ---
+		{
+			Name: "BUNDLE_LOCAL__RACK is a config key (local.rack), not a credential",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_LOCAL__RACK=/path/to/rack
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "BUNDLE_GEMFURY__IO triggers (.io TLD)",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_GEMFURY__IO="user:token"
+`,
+			WantViolations: 1,
+		},
+		// --- Meta-ARG suppression honors per-stage filters (codex P2) ---
+		{
+			Name: "meta-ARG with only dev Ruby stage does not trigger",
+			Content: `ARG BUNDLE_GITHUB__COM
+FROM ruby:3.3-slim AS dev
+`,
+			WantViolations: 0,
+		},
 	})
 }

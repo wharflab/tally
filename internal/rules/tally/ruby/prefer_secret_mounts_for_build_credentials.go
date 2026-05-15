@@ -112,15 +112,24 @@ func (r *PreferSecretMountsForBuildCredentialsRule) Check(input rules.LintInput)
 }
 
 // dockerfileHasRubyStage reports whether at least one stage in the
-// Dockerfile is Ruby-shaped — used to gate meta-ARG checks (which run
-// before any FROM and so can't be tied to a specific stage).
+// Dockerfile is Ruby-shaped AND would not be filtered out of the
+// per-stage scan — used to gate meta-ARG checks (which run before any
+// FROM and so can't be tied to a specific stage). Without this, a
+// Dockerfile that has only `dev`/`test` Ruby stages would still emit
+// meta-ARG findings even though every per-stage check would skip.
 func dockerfileHasRubyStage(input rules.LintInput) bool {
 	if input.Facts == nil {
 		return false
 	}
 	for stageIdx, stage := range input.Stages {
+		if stagename.LooksLikeDev(stage.Name) {
+			continue
+		}
 		sf := input.Facts.Stage(stageIdx)
 		if sf == nil {
+			continue
+		}
+		if sf.BaseImageOS == semantic.BaseImageOSWindows {
 			continue
 		}
 		if stageLooksLikeRuby(input.Semantic, stageIdx, stage, sf) {
@@ -203,18 +212,45 @@ func matchRubyBuildCredentialKey(key string) (string, bool) {
 	return "", false
 }
 
+// bundlerHostCredentialTLDs is the set of TLDs that, when they appear
+// as the trailing `__<TLD>` segment of a `BUNDLE_*` key, signal a
+// host-credential rather than a generic dotted config key.
+//
+// Bundler's `__` is overloaded — it encodes `.` for both
+// `BUNDLE_GITHUB__COM` (a credential) AND `BUNDLE_LOCAL__RACK` (a
+// config key for `local.rack`). Trailing-TLD discrimination is the
+// least bad heuristic without a registry of known config keys. We err
+// on the side of completeness and include the public-suffix TLDs
+// commonly seen on gem-host URLs.
+var bundlerHostCredentialTLDs = map[string]bool{
+	"COM": true,
+	"ORG": true,
+	"NET": true,
+	"IO":  true,
+	"DEV": true,
+	"CO":  true,
+	"AI":  true,
+}
+
 // isBundlerHostCredentialKey reports whether a key matches Bundler's
 // `BUNDLE_<HOST>__<TLD>` host-credential convention. Host names use
 // `__` (double underscore) for `.` (dot), so a real Bundler key has at
-// least one `__` separator.
+// least one `__` separator AND ends with a known TLD segment to
+// distinguish from configuration keys like `BUNDLE_LOCAL__RACK`
+// (Bundler's `local.rack` config).
 func isBundlerHostCredentialKey(key string) bool {
 	if !strings.HasPrefix(key, "BUNDLE_") {
 		return false
 	}
-	// Must have at least one `__` after the BUNDLE_ prefix to look like
-	// a host (dot-separated) credential.
 	rest := strings.TrimPrefix(key, "BUNDLE_")
-	return strings.Contains(rest, "__")
+	if !strings.Contains(rest, "__") {
+		return false
+	}
+	// The trailing `__<TLD>` segment must be a recognized public-suffix
+	// TLD. Take the last `__`-separated token.
+	idx := strings.LastIndex(rest, "__")
+	tld := rest[idx+2:]
+	return bundlerHostCredentialTLDs[tld]
 }
 
 func preferSecretMountsDetail(envKey, secretID, instruction string) string {
