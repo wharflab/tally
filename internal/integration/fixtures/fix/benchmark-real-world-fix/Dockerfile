@@ -1,5 +1,5 @@
-ARG BUILDER_IMAGE=ubuntu:22.04
-ARG RUNTIME_IMAGE=ubuntu:22.04
+ARG BUILDER_IMAGE=ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7
+ARG RUNTIME_IMAGE=ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7
 FROM $BUILDER_IMAGE as python_builder_1
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates wget && apt-get clean && rm -rf /var/lib/apt/lists/*

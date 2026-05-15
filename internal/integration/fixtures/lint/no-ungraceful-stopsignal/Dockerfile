@@ -1,11 +1,11 @@
-FROM alpine:3.20 AS builder
+FROM alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc AS builder
 STOPSIGNAL SIGKILL
 RUN echo build
 
-FROM nginx:1.27
+FROM nginx:1.27@sha256:6784fb0834aa7dbbe12e3d7471e69c290df3e6ba810dc38b34ae33d3c1c05f7d
 STOPSIGNAL SIGQUIT
 CMD ["nginx", "-g", "daemon off;"]
 
-FROM postgres:16
+FROM postgres:16@sha256:ff23cdce56cac62ada6f66013e1a50864c0abbe79d132d40b6e05bd80f378a70
 STOPSIGNAL SIGSTOP
 CMD ["postgres"]

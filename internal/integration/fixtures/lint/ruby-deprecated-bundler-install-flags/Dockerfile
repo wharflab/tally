@@ -1,21 +1,21 @@
 # --without (deprecated): triggers.
-FROM ruby:3.3-slim AS app-without
+FROM ruby:3.3-slim@sha256:a26bfb9409c02987e6b7f8649f0d4c71cc8a4a97475f3f1edfc2fc6a490021ae AS app-without
 RUN bundle install --without development
 
 # --deployment (deprecated): triggers.
-FROM ruby:3.3-slim AS app-deployment
+FROM ruby:3.3-slim@sha256:a26bfb9409c02987e6b7f8649f0d4c71cc8a4a97475f3f1edfc2fc6a490021ae AS app-deployment
 RUN bundle install --deployment
 
 # --path (deprecated): triggers (FixSuggestion).
-FROM ruby:3.3-slim AS app-path
+FROM ruby:3.3-slim@sha256:a26bfb9409c02987e6b7f8649f0d4c71cc8a4a97475f3f1edfc2fc6a490021ae AS app-path
 RUN bundle install --path vendor/bundle
 
 # --without --deployment combined: two violations.
-FROM ruby:3.3-slim AS app-combined
+FROM ruby:3.3-slim@sha256:a26bfb9409c02987e6b7f8649f0d4c71cc8a4a97475f3f1edfc2fc6a490021ae AS app-combined
 RUN bundle install --without development --deployment
 
 # Compliant: no deprecated flags.
-FROM ruby:3.3-slim AS app-compliant
+FROM ruby:3.3-slim@sha256:a26bfb9409c02987e6b7f8649f0d4c71cc8a4a97475f3f1edfc2fc6a490021ae AS app-compliant
 ENV BUNDLE_WITHOUT="development"
 ENV BUNDLE_DEPLOYMENT="1"
 RUN bundle install --jobs 4

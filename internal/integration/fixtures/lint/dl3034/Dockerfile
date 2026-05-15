@@ -1,4 +1,4 @@
-FROM opensuse/leap:15.4
+FROM opensuse/leap:15.4@sha256:6b5d2aaf5dd15233269c9dc0de9a9e1c9585e46cdf9aaaaaeac1acb3091a3a74
 
 # DL3034: Should warn - zypper install without non-interactive
 RUN zypper install httpd

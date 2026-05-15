@@ -1,10 +1,10 @@
 # Builder stage — COPY before USER is fine (root context)
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7 AS builder
 COPY build.conf /etc/build.conf
 RUN echo "build"
 
 # Stage with USER that flows into child via FROM
-FROM ubuntu:22.04 AS base
+FROM ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7 AS base
 RUN useradd -r appuser
 USER appuser
 
@@ -13,7 +13,7 @@ FROM base AS app
 COPY app /app
 
 # Non-root USER with COPY and ADD — violations + both fix alts
-FROM ubuntu:22.04 AS runtime
+FROM ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7 AS runtime
 RUN useradd -r appuser
 USER appuser
 COPY app /app
@@ -21,24 +21,24 @@ ADD config.tar.gz /etc/app/
 RUN setup.sh
 
 # COPY with --chown already set — no violation
-FROM ubuntu:22.04 AS ok-chown
+FROM ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7 AS ok-chown
 USER appuser
 COPY --chown=appuser:appuser app /app
 
 # COPY after USER root — no violation
-FROM ubuntu:22.04 AS root-user
+FROM ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7 AS root-user
 USER root
 COPY app /app
 
 # RUN chown on same path suppresses the violation
-FROM ubuntu:22.04 AS chown-suppressed
+FROM ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7 AS chown-suppressed
 USER appuser
 COPY app /app
 EXPOSE 8080
 RUN chown -R appuser:appuser /app
 
 # RUN between USER and COPY — violation with Alt 1 only
-FROM ubuntu:22.04 AS run-gap
+FROM ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7 AS run-gap
 USER appuser
 RUN mkdir -p /app
 COPY app /app

@@ -1,6 +1,6 @@
 # Variant 3 violation: HEALTHCHECK uses curl, which on `ruby:*-slim`
 # requires an extra `apt-get install curl` step. Switch to the Ruby
 # stdlib's Net::HTTP form (already in the image).
-FROM ruby:3.3-slim
+FROM ruby:3.3-slim@sha256:a26bfb9409c02987e6b7f8649f0d4c71cc8a4a97475f3f1edfc2fc6a490021ae
 HEALTHCHECK CMD curl -fsS http://127.0.0.1:3000/up || exit 1
 CMD ["bin/rails", "server"]

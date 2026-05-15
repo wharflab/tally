@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.23
+ARG GO_VERSION=1.23@sha256:60deed95d3888cc5e4d9ff8a10c54e5edc008c6ae3fba6187be6fb592e19e8c0
 
 FROM golang:${GO_VERSION} AS builder
 
@@ -12,7 +12,7 @@ FROM golang:${GO_VERSION} AS builder
 
 	RUN go build -o /app ./cmd/server
 
-FROM alpine:3.20 AS runtime
+FROM alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc AS runtime
 
 	RUN apk --no-cache add ca-certificates tzdata
 	RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf \

@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:22.04@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7
 
 # Heredoc candidate with pipe: DL4006 should detect but suppress fix
 # since prefer-run-heredoc would convert this to a heredoc

@@ -1,4 +1,4 @@
-FROM ubuntu:jammy AS builder
+FROM ubuntu:jammy@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7 AS builder
 RUN apt-get update && apt-get install -y build-essential git \
     libssl-dev zlib1g-dev pkg-config autoconf \
     automake autotools-dev autopoint libtool libgcrypt-dev libgnutls28-dev \
@@ -27,7 +27,7 @@ RUN autoreconf -i && \
     && make -j$(nproc) \
     && make install
 
-FROM ubuntu:jammy
+FROM ubuntu:jammy@sha256:962f6cadeae0ea6284001009daa4cc9a8c37e75d1f5191cf0eb83fe565b63dd7
 
 COPY --from=builder /usr/local/bin/aria2c /usr/local/bin/
 

@@ -1,6 +1,6 @@
 # Test that shell-specific rules are disabled for non-POSIX shells
 # hadolint shell=powershell
-FROM mcr.microsoft.com/windows/servercore:ltsc2022
+FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:86da395cfd2b35dbfc2e9d08719550c51b0570c394bff8f92622a19234766185
 
 # This would trigger DL3004 (sudo) if shell analysis was active
 # but should be ignored because PowerShell is non-POSIX

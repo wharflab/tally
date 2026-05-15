@@ -1,5 +1,5 @@
 #escape=`
-FROM teeks99/msvc-win:14.0
+FROM teeks99/msvc-win:14.0@sha256:e3fa693de53fa77d74e57945bbceb5b655e74855a043594ba447a82145f537b1
   
 SHELL ["powershell", "-command"]
 # Install Chocolatey

@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/powershell:6.2.1-alpine-3.8
+FROM mcr.microsoft.com/powershell:6.2.1-alpine-3.8@sha256:dd874d97e120b4036f304bcb6393282c6ff9a1ba7be403d649a43c3c574c41f6
 SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 WORKDIR /app

@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/windows/servercore/iis:windowsservercore-ltsc2019
+FROM mcr.microsoft.com/windows/servercore/iis:windowsservercore-ltsc2019@sha256:4bdbae6d649a94ab03fef8b170cba24b7551255c0e6f42cb68e8e12015e3016b
 
 # Install Chocolatey
 RUN @powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:ChocolateyUseWindowsCompression='false'; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"

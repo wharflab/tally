@@ -2,7 +2,7 @@
 # Install Visual Studio Build tools based on
 # https://docs.microsoft.com/en-us/visualstudio/install/build-tools-container?view=vs-2019
 
-FROM mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2019
+FROM mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2019@sha256:132411df313f8d9d136ff5852f41ccd86838ee989dfe094d407aca5ce0018b69
 
 # Download the Build Tools bootstrapper.
 ADD https://aka.ms/vs/16/release/vs_buildtools.exe vs_buildtools.exe

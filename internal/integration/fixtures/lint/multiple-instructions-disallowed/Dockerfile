@@ -1,8 +1,8 @@
-FROM alpine:3.21 AS builder
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS builder
 CMD echo "build"
 RUN echo "hello"
 CMD echo "run"
-FROM alpine:3.21
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
 ENTRYPOINT ["/bin/bash"]
 ENTRYPOINT ["/bin/sh"]
 HEALTHCHECK CMD curl -f http://localhost/

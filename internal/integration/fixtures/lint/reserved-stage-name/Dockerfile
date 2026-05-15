@@ -1,8 +1,8 @@
-FROM alpine:3.21 AS scratch
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS scratch
 RUN echo "should not name stage scratch"
 
-FROM alpine:3.21 AS context
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS context
 RUN echo "should not name stage context"
 
-FROM alpine:3.21 AS builder
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d AS builder
 COPY --from=scratch /etc/alpine-release /tmp/

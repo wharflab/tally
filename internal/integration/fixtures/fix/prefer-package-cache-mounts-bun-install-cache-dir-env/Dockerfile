@@ -1,3 +1,3 @@
-FROM oven/bun:1.2
+FROM oven/bun:1.2@sha256:6ebf306367da43ad75c4d5119563e24de9b66372929ad4fa31546be053a16f74
 ENV BUN_INSTALL_CACHE_DIR=/tmp/bun-cache
 RUN bun install
