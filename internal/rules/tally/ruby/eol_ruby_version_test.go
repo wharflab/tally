@@ -1,7 +1,6 @@
 package ruby
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/wharflab/tally/internal/rules"
@@ -108,10 +107,63 @@ RUN bundle install
 		t.Errorf("Safety = %v, want FixSuggestion", v.SuggestedFix.Safety)
 	}
 	got := v.SuggestedFix.Edits[0].NewText
-	want := supportedRubyBranches[0] + "-slim"
-	if !strings.Contains(got, want) {
-		t.Errorf("fix should contain %q (latest supported branch + variant); got: %q",
-			want, got)
+	want := "ruby:" + supportedRubyBranches[0] + "-slim"
+	if got != want {
+		t.Errorf("fix NewText = %q, want %q", got, want)
+	}
+}
+
+func TestEOLRubyVersionRule_FixDropsPatchLevel(t *testing.T) {
+	t.Parallel()
+
+	// Regression for codex P2 / greptile P1 / gemini medium: rewriting
+	// `ruby:3.1.6` → `ruby:3.4.6` would carry the old branch's patch
+	// number into the new branch and produce a tag that may not exist
+	// on Docker Hub. The fix must drop the patch level.
+	content := `FROM ruby:3.1.6
+RUN bundle install
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewEOLRubyVersionRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	v := violations[0]
+	if v.SuggestedFix == nil {
+		t.Fatal("expected a suggested fix")
+	}
+	got := v.SuggestedFix.Edits[0].NewText
+	want := "ruby:" + supportedRubyBranches[0]
+	if got != want {
+		t.Errorf("fix NewText = %q, want %q (must drop patch level)", got, want)
+	}
+}
+
+func TestEOLRubyVersionRule_FixPreservesVariant(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		from string
+		want string
+	}{
+		{"FROM ruby:3.0-slim\n", "ruby:" + supportedRubyBranches[0] + "-slim"},
+		{"FROM ruby:3.0-bookworm\n", "ruby:" + supportedRubyBranches[0] + "-bookworm"},
+		{"FROM ruby:3.0-alpine3.19\n", "ruby:" + supportedRubyBranches[0] + "-alpine3.19"},
+		{"FROM ruby:2.7.0-alpine\n", "ruby:" + supportedRubyBranches[0] + "-alpine"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.from, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.from)
+			violations := NewEOLRubyVersionRule().Check(input)
+			if len(violations) != 1 {
+				t.Fatalf("got %d violations, want 1", len(violations))
+			}
+			got := violations[0].SuggestedFix.Edits[0].NewText
+			if got != tt.want {
+				t.Errorf("fix NewText = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

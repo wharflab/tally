@@ -103,7 +103,6 @@ func (r *EOLRubyVersionRule) Check(input rules.LintInput) []rules.Violation {
 			continue
 		}
 		v := r.checkStage(input, stageIdx, rubyFacts, meta)
-		_ = sf // facts.StageFacts no longer needed after Windows-OS guard
 		if v != nil {
 			violations = append(violations, *v)
 		}
@@ -157,7 +156,7 @@ func (r *EOLRubyVersionRule) checkStage(
 	v := rules.NewViolation(loc, meta.Code, meta.Description, severity).
 		WithDocURL(meta.DocURL).
 		WithDetail(eolRubyVersionDetail(branch, info))
-	if fix := buildEOLRubyVersionFix(input, stageIdx, raw, branch, meta.FixPriority); fix != nil {
+	if fix := buildEOLRubyVersionFix(input, stageIdx, raw, meta.FixPriority); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
 	return &v
@@ -259,7 +258,7 @@ func stageBaseLocation(input rules.LintInput, stageIdx int) rules.Location {
 func buildEOLRubyVersionFix(
 	input rules.LintInput,
 	stageIdx int,
-	raw, branch string,
+	raw string,
 	priority int,
 ) *rules.SuggestedFix {
 	// Only emit a fix when the FROM is a literal ruby:X.Y tag we can
@@ -269,14 +268,18 @@ func buildEOLRubyVersionFix(
 		return nil
 	}
 	target := supportedRubyBranches[0]
-	// Preserve the variant suffix (everything after the first occurrence
-	// of the EOL branch in the tag).
-	newRaw := strings.Replace(raw, branch, target, 1)
-	if newRaw == raw {
+	// Rewrite the entire major.minor[.patch[pNNN]] portion of the tag —
+	// not just the major.minor prefix. `strings.Replace(raw, branch,
+	// target, 1)` would carry `ruby:3.1.6` to `ruby:3.4.6`, which may
+	// not be a published tag on Docker Hub. Preserve only the variant
+	// suffix (`-slim`, `-alpine`, `-bookworm`, ...).
+	newRaw := rewriteRubyTagToSupportedBranch(raw, target)
+	if newRaw == "" || newRaw == raw {
 		return nil
 	}
-	// Find the location of the raw tag in the FROM line. Use the stage's
-	// FROM range; the rewrite is the whole base-image reference.
+	// Find the location of the raw tag in the FROM source. Use the
+	// stage's FROM range and search across all lines covered by the
+	// instruction (ARG-templated FROMs may use line continuations).
 	if stageIdx < 0 || stageIdx >= len(input.Stages) {
 		return nil
 	}
@@ -289,12 +292,21 @@ func buildEOLRubyVersionFix(
 		return nil
 	}
 	startLine := stage.Location[0].Start.Line
-	line := sm.Line(startLine - 1)
-	idx := strings.Index(line, raw)
-	if idx < 0 {
+	endLine := stage.Location[len(stage.Location)-1].End.Line
+	var lineNo, idx int
+	for lineNo = startLine; lineNo <= endLine; lineNo++ {
+		line := sm.Line(lineNo - 1)
+		idx = strings.Index(line, raw)
+		if idx >= 0 {
+			break
+		}
+	}
+	if idx < 0 || lineNo > endLine {
 		return nil
 	}
-	startCol := idx + 1
+	// rules.NewRangeLocation columns are 0-based; strings.Index returns
+	// a 0-based offset.
+	startCol := idx
 	endCol := startCol + len(raw)
 	return &rules.SuggestedFix{
 		Description: "Bump the Ruby base image to a supported branch (" + target + ")",
@@ -302,10 +314,39 @@ func buildEOLRubyVersionFix(
 		Priority:    priority,
 		IsPreferred: true,
 		Edits: []rules.TextEdit{{
-			Location: rules.NewRangeLocation(input.File, startLine, startCol, startLine, endCol),
+			Location: rules.NewRangeLocation(input.File, lineNo, startCol, lineNo, endCol),
 			NewText:  newRaw,
 		}},
 	}
+}
+
+// rewriteRubyTagToSupportedBranch rewrites a `ruby:X.Y[.Z[pNNN]][-variant]`
+// reference to use the supplied supported branch (X.Y), preserving only
+// the variant suffix. Returns "" when the input doesn't match a parseable
+// ruby:* reference (the rule should suppress its fix in that case).
+//
+// Examples:
+//
+//	ruby:3.0          -> ruby:3.4
+//	ruby:3.0-slim     -> ruby:3.4-slim
+//	ruby:3.1.6        -> ruby:3.4
+//	ruby:2.7.0-bookworm -> ruby:3.4-bookworm
+//	ruby:2.7.0p100-alpine -> ruby:3.4-alpine
+//	docker.io/library/ruby:3.0 -> docker.io/library/ruby:3.4
+func rewriteRubyTagToSupportedBranch(raw, targetBranch string) string {
+	colon := strings.LastIndex(raw, ":")
+	if colon < 0 || colon == len(raw)-1 {
+		return ""
+	}
+	before, tag := raw[:colon], raw[colon+1:]
+	// Find the variant suffix (everything starting from the first `-`
+	// in the tag — `slim`, `alpine`, `bookworm`, etc. don't appear in
+	// the version itself).
+	variant := ""
+	if dash := strings.IndexByte(tag, '-'); dash >= 0 {
+		variant = tag[dash:] // includes the leading `-`
+	}
+	return before + ":" + targetBranch + variant
 }
 
 func init() {
