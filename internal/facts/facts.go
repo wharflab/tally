@@ -16,6 +16,7 @@ import (
 	dfshell "github.com/moby/buildkit/frontend/dockerfile/shell"
 
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/facts/ruby"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
@@ -33,6 +34,9 @@ type FileFacts struct {
 	once   sync.Once
 	stages []*StageFacts
 	runs   []*RunFacts
+
+	rubyOnce  sync.Once
+	rubyFacts *ruby.RubyFacts
 }
 
 // StageFacts contains derived facts for a single build stage.
@@ -329,6 +333,29 @@ func (f *FileFacts) Labels() []LabelPairFact {
 		labels = append(labels, stage.Labels...)
 	}
 	return labels
+}
+
+// RubyFacts returns the cached Ruby project state derived from the build
+// context (Gemfile, Gemfile.lock, .ruby-version, .tool-versions). The
+// returned value is non-nil; individual sub-fields (Lockfile, Gemfile,
+// RubyVersion) are populated only when the corresponding files are
+// observable and parseable. Rules can therefore unconditionally call
+// `input.Facts.RubyFacts().Lockfile` and check for nil.
+//
+// The result is computed once per *FileFacts and shared by every rule that
+// asks for it.
+func (f *FileFacts) RubyFacts() *ruby.RubyFacts {
+	if f == nil {
+		return &ruby.RubyFacts{}
+	}
+	f.rubyOnce.Do(func() {
+		var reader ruby.ContextFileReader
+		if f.contextFiles != nil {
+			reader = f.contextFiles
+		}
+		f.rubyFacts = ruby.Load(reader)
+	})
+	return f.rubyFacts
 }
 
 func (f *FileFacts) build() {

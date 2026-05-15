@@ -1,0 +1,15 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    actionpack (5.2.3)
+      activesupport (= 5.2.3)
+    activesupport (5.2.3)
+    rails (5.2.3)
+      actionpack (= 5.2.3)
+      activesupport (= 5.2.3)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  rails (~> 5.2)
