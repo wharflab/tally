@@ -171,11 +171,57 @@ func isGemInstallBundler(ci shell.CommandInfo) bool {
 			// Skip the `install` subcommand token itself.
 			continue
 		}
-		if a == "bundler" {
+		if strings.EqualFold(a, "bundler") {
 			return true
 		}
 	}
 	return false
+}
+
+// gemInstallTargetsOnlyBundler reports whether the `gem install` invocation
+// installs ONLY bundler (with optional version-pin flags). Used by the fix
+// builder to avoid auto-deleting RUNs that install bundler alongside other
+// gems, which would silently remove dependencies the user explicitly listed.
+//
+// Recognized "bundler-only" shapes:
+//
+//	gem install bundler
+//	gem install bundler -v 2.5.6
+//	gem install bundler -v=2.5.6
+//	gem install bundler --version 2.5.6
+//	gem install bundler --version=2.5.6
+//	gem install -v 2.5.6 bundler
+//
+// Returns false for `gem install bundler rails`, `gem install bundler:2.5.6 rake`,
+// or any other multi-target install.
+func gemInstallTargetsOnlyBundler(ci shell.CommandInfo) bool {
+	sawBundler := false
+	skipNext := false
+	for i, a := range ci.Args {
+		if i == 0 && strings.EqualFold(a, ci.Subcommand) {
+			continue
+		}
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		// Version-pin flags consume a following arg as the value.
+		if a == "-v" || a == "--version" {
+			skipNext = true
+			continue
+		}
+		// Any other flag-shaped arg is harmless to the rule.
+		if strings.HasPrefix(a, "-") {
+			continue
+		}
+		// Non-flag arg: must be exactly "bundler". Any other gem name
+		// (rails, rake, etc.) means this is a multi-target install.
+		if !strings.EqualFold(a, "bundler") {
+			return false
+		}
+		sawBundler = true
+	}
+	return sawBundler
 }
 
 // redundantBundlerInstallLocation prefers the precise command-name span when
@@ -233,9 +279,15 @@ func buildRedundantBundlerInstallFix(
 	if sm == nil {
 		return nil
 	}
-	// When the RUN has only a single command, delete the whole RUN line.
-	// Detect "single command" via CommandInfos length.
-	if len(runFacts.CommandInfos) == 1 && runFacts.CommandInfos[0].Name == cmd.Name {
+	// When the RUN has only a single command AND the install targets only
+	// bundler (no other gems chained as positional args), delete the whole
+	// RUN line. The "only bundler" guard is critical: `gem install bundler
+	// rails` is a single CommandInfo, but auto-deleting that RUN silently
+	// removes the `rails` install too. For multi-target installs we fall
+	// through to the no-edit suggestion below.
+	if len(runFacts.CommandInfos) == 1 &&
+		runFacts.CommandInfos[0].Name == cmd.Name &&
+		gemInstallTargetsOnlyBundler(cmd) {
 		runRanges := runFacts.Run.Location()
 		if len(runRanges) == 0 {
 			return nil

@@ -168,3 +168,53 @@ RUN gem install bundler && bundle install
 		t.Errorf("expected no edits for chained command; got %d", len(v.SuggestedFix.Edits))
 	}
 }
+
+func TestRedundantBundlerInstallRule_NoEditFixForMultiGemInstall(t *testing.T) {
+	t.Parallel()
+
+	// Regression for codex/gemini/greptile P1: `gem install bundler rails`
+	// is a SINGLE CommandInfo, but auto-deleting that RUN would silently
+	// remove the `rails` install too. The fix MUST fall back to a no-edit
+	// suggestion so the user explicitly chooses how to disentangle the
+	// chain.
+	content := `FROM ruby:3.3-slim
+RUN gem install bundler rails
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewRedundantBundlerInstallRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	v := violations[0]
+	if v.SuggestedFix == nil {
+		t.Fatal("expected a suggested fix")
+	}
+	if len(v.SuggestedFix.Edits) != 0 {
+		t.Errorf("multi-gem install must produce a no-edit suggestion; got %d edits",
+			len(v.SuggestedFix.Edits))
+	}
+}
+
+func TestRedundantBundlerInstallRule_DeleteFixOKForBundlerWithVersion(t *testing.T) {
+	t.Parallel()
+
+	// `gem install bundler -v 2.5.6` (bundler-only with a version pin)
+	// SHOULD still get the whole-RUN delete fix — the `-v` flag and its
+	// value don't add another gem target.
+	content := `FROM ruby:3.3-slim
+RUN gem install bundler -v 2.5.6
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewRedundantBundlerInstallRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	v := violations[0]
+	if v.SuggestedFix == nil {
+		t.Fatal("expected a suggested fix")
+	}
+	if len(v.SuggestedFix.Edits) != 1 {
+		t.Errorf("bundler-only install with -v should produce a delete edit; got %d edits",
+			len(v.SuggestedFix.Edits))
+	}
+}
