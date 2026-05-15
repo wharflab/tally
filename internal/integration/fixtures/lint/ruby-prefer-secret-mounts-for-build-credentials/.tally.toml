@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/ruby/prefer-secret-mounts-for-build-credentials"]
+exclude = ["*"]

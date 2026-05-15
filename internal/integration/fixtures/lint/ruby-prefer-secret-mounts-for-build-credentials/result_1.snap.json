@@ -1,0 +1,139 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-prefer-secret-mounts-for-build-credentials/Dockerfile",
+      "violations": [
+        {
+          "detail": "`BUNDLE_GITHUB__COM` is a build-time credential; declaring it via ARG bakes the value into image history (`docker history --no-trunc \u003cimage\u003e`) and into the build cache key data. Pass it through a BuildKit secret mount instead — the secret exists for the duration of the RUN it's mounted into and never enters image content or cache key data: `RUN --mount=type=secret,id=github_token,env=BUNDLE_GITHUB__COM \u003ccommand\u003e`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/prefer-secret-mounts-for-build-credentials/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/ruby-prefer-secret-mounts-for-build-credentials/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "Build-time credential declared via ARG/ENV; prefer `RUN --mount=type=secret,...`",
+          "rule": "tally/ruby/prefer-secret-mounts-for-build-credentials",
+          "severity": "info",
+          "sourceCode": "ARG BUNDLE_GITHUB__COM",
+          "suggestedFix": {
+            "description": "Replace ARG/ENV BUNDLE_GITHUB__COM with `RUN --mount=type=secret,id=github_token,env=BUNDLE_GITHUB__COM \u003ccommand\u003e`. Pass the secret value at build time via `docker buildx build --secret id=github_token,src=...`.",
+            "priority": 88,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "`BUNDLE_GITHUB__COM` is a build-time credential; declaring it via ENV bakes the value into image history (`docker history --no-trunc \u003cimage\u003e`) and into the build cache key data. Pass it through a BuildKit secret mount instead — the secret exists for the duration of the RUN it's mounted into and never enters image content or cache key data: `RUN --mount=type=secret,id=github_token,env=BUNDLE_GITHUB__COM \u003ccommand\u003e`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/prefer-secret-mounts-for-build-credentials/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "fixtures/lint/ruby-prefer-secret-mounts-for-build-credentials/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "Build-time credential declared via ARG/ENV; prefer `RUN --mount=type=secret,...`",
+          "rule": "tally/ruby/prefer-secret-mounts-for-build-credentials",
+          "severity": "info",
+          "sourceCode": "ENV BUNDLE_GITHUB__COM=\"user:token\"",
+          "suggestedFix": {
+            "description": "Replace ARG/ENV BUNDLE_GITHUB__COM with `RUN --mount=type=secret,id=github_token,env=BUNDLE_GITHUB__COM \u003ccommand\u003e`. Pass the secret value at build time via `docker buildx build --secret id=github_token,src=...`.",
+            "priority": 88,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "`BUNDLE_GEMS__MYCOMPANY__COM` is a build-time credential; declaring it via ARG bakes the value into image history (`docker history --no-trunc \u003cimage\u003e`) and into the build cache key data. Pass it through a BuildKit secret mount instead — the secret exists for the duration of the RUN it's mounted into and never enters image content or cache key data: `RUN --mount=type=secret,id=bundle_gems__mycompany__com,env=BUNDLE_GEMS__MYCOMPANY__COM \u003ccommand\u003e`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/prefer-secret-mounts-for-build-credentials/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "fixtures/lint/ruby-prefer-secret-mounts-for-build-credentials/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "Build-time credential declared via ARG/ENV; prefer `RUN --mount=type=secret,...`",
+          "rule": "tally/ruby/prefer-secret-mounts-for-build-credentials",
+          "severity": "info",
+          "sourceCode": "ARG BUNDLE_GEMS__MYCOMPANY__COM",
+          "suggestedFix": {
+            "description": "Replace ARG/ENV BUNDLE_GEMS__MYCOMPANY__COM with `RUN --mount=type=secret,id=bundle_gems__mycompany__com,env=BUNDLE_GEMS__MYCOMPANY__COM \u003ccommand\u003e`. Pass the secret value at build time via `docker buildx build --secret id=bundle_gems__mycompany__com,src=...`.",
+            "priority": 88,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "`GEM_HOST_API_KEY` is a build-time credential; declaring it via ENV bakes the value into image history (`docker history --no-trunc \u003cimage\u003e`) and into the build cache key data. Pass it through a BuildKit secret mount instead — the secret exists for the duration of the RUN it's mounted into and never enters image content or cache key data: `RUN --mount=type=secret,id=rubygems_api_key,env=GEM_HOST_API_KEY \u003ccommand\u003e`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/prefer-secret-mounts-for-build-credentials/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "fixtures/lint/ruby-prefer-secret-mounts-for-build-credentials/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "Build-time credential declared via ARG/ENV; prefer `RUN --mount=type=secret,...`",
+          "rule": "tally/ruby/prefer-secret-mounts-for-build-credentials",
+          "severity": "info",
+          "sourceCode": "ENV GEM_HOST_API_KEY=\"abc123\"",
+          "suggestedFix": {
+            "description": "Replace ARG/ENV GEM_HOST_API_KEY with `RUN --mount=type=secret,id=rubygems_api_key,env=GEM_HOST_API_KEY \u003ccommand\u003e`. Pass the secret value at build time via `docker buildx build --secret id=rubygems_api_key,src=...`.",
+            "priority": 88,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "`NPM_TOKEN` is a build-time credential; declaring it via ENV bakes the value into image history (`docker history --no-trunc \u003cimage\u003e`) and into the build cache key data. Pass it through a BuildKit secret mount instead — the secret exists for the duration of the RUN it's mounted into and never enters image content or cache key data: `RUN --mount=type=secret,id=npm_token,env=NPM_TOKEN \u003ccommand\u003e`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/prefer-secret-mounts-for-build-credentials/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 19
+            },
+            "file": "fixtures/lint/ruby-prefer-secret-mounts-for-build-credentials/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 19
+            }
+          },
+          "message": "Build-time credential declared via ARG/ENV; prefer `RUN --mount=type=secret,...`",
+          "rule": "tally/ruby/prefer-secret-mounts-for-build-credentials",
+          "severity": "info",
+          "sourceCode": "ENV NPM_TOKEN=\"ghp_abc\"",
+          "suggestedFix": {
+            "description": "Replace ARG/ENV NPM_TOKEN with `RUN --mount=type=secret,id=npm_token,env=NPM_TOKEN \u003ccommand\u003e`. Pass the secret value at build time via `docker buildx build --secret id=npm_token,src=...`.",
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 5,
+    "style": 0,
+    "total": 5,
+    "warnings": 0
+  }
+}
