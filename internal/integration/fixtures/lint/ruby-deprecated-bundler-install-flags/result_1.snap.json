@@ -8,12 +8,12 @@
           "docUrl": "https://tally.wharflab.com/rules/tally/ruby/deprecated-bundler-install-flags/",
           "location": {
             "end": {
-              "column": 18,
+              "column": 28,
               "line": 3
             },
             "file": "fixtures/lint/ruby-deprecated-bundler-install-flags/Dockerfile",
             "start": {
-              "column": 11,
+              "column": 19,
               "line": 3
             }
           },
@@ -31,12 +31,12 @@
           "docUrl": "https://tally.wharflab.com/rules/tally/ruby/deprecated-bundler-install-flags/",
           "location": {
             "end": {
-              "column": 18,
+              "column": 31,
               "line": 7
             },
             "file": "fixtures/lint/ruby-deprecated-bundler-install-flags/Dockerfile",
             "start": {
-              "column": 11,
+              "column": 19,
               "line": 7
             }
           },
@@ -54,12 +54,12 @@
           "docUrl": "https://tally.wharflab.com/rules/tally/ruby/deprecated-bundler-install-flags/",
           "location": {
             "end": {
-              "column": 18,
+              "column": 25,
               "line": 11
             },
             "file": "fixtures/lint/ruby-deprecated-bundler-install-flags/Dockerfile",
             "start": {
-              "column": 11,
+              "column": 19,
               "line": 11
             }
           },
@@ -78,12 +78,12 @@
           "docUrl": "https://tally.wharflab.com/rules/tally/ruby/deprecated-bundler-install-flags/",
           "location": {
             "end": {
-              "column": 18,
+              "column": 28,
               "line": 15
             },
             "file": "fixtures/lint/ruby-deprecated-bundler-install-flags/Dockerfile",
             "start": {
-              "column": 11,
+              "column": 19,
               "line": 15
             }
           },
@@ -93,6 +93,29 @@
           "sourceCode": "RUN bundle install --without development --deployment",
           "suggestedFix": {
             "description": "Replace `--without` with `ENV BUNDLE_WITHOUT=\"development\"` (Bundler 2.x prefers the env-var form)",
+            "priority": 88
+          }
+        },
+        {
+          "detail": "Bundler 2.x deprecated `bundle install --deployment` in favor of `ENV BUNDLE_DEPLOYMENT=...` (or `bundle config set DEPLOYMENT ...`). The flag still works but emits a deprecation notice on every CI run, and is slated for removal in Bundler 3.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/deprecated-bundler-install-flags/",
+          "location": {
+            "end": {
+              "column": 53,
+              "line": 15
+            },
+            "file": "fixtures/lint/ruby-deprecated-bundler-install-flags/Dockerfile",
+            "start": {
+              "column": 41,
+              "line": 15
+            }
+          },
+          "message": "`bundle install` uses a flag deprecated in Bundler 2.x (--without, --deployment, --path)",
+          "rule": "tally/ruby/deprecated-bundler-install-flags",
+          "severity": "warning",
+          "sourceCode": "RUN bundle install --without development --deployment",
+          "suggestedFix": {
+            "description": "Replace `--deployment` with `ENV BUNDLE_DEPLOYMENT=\"1\"` (Bundler 2.x prefers the env-var form)",
             "priority": 88
           }
         }
@@ -106,7 +129,7 @@
     "files": 1,
     "info": 0,
     "style": 0,
-    "total": 4,
-    "warnings": 4
+    "total": 5,
+    "warnings": 5
   }
 }
