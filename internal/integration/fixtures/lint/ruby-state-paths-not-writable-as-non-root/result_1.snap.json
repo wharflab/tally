@@ -1,0 +1,60 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-state-paths-not-writable-as-non-root/Dockerfile",
+      "violations": [
+        {
+          "detail": "When the runtime stage runs as `rails`, copying application content without `--chown=rails:rails` leaves the Rails state directories (tmp, log, storage, db) root-owned. Rails crashes on first request when ActionView, ActiveStorage, ActiveRecord, or `bin/rails db:prepare` tries to write to them. Add `--chown=rails:rails` to the offending COPY (the Rails generator template's exact pattern) or perform an explicit `chown -R rails:rails` on the state directories before switching to USER.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/state-paths-not-writable-as-non-root/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "fixtures/lint/ruby-state-paths-not-writable-as-non-root/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "Rails app COPY without --chown leaves state dirs (tmp, log, storage, db) root-owned at runtime",
+          "rule": "tally/ruby/state-paths-not-writable-as-non-root",
+          "severity": "warning",
+          "sourceCode": "COPY . .",
+          "suggestedFix": {
+            "description": "Add --chown=rails:rails so Rails state dirs are writable at runtime",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 5,
+                    "line": 5
+                  },
+                  "file": "fixtures/lint/ruby-state-paths-not-writable-as-non-root/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 5
+                  }
+                },
+                "newText": "--chown=rails:rails "
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

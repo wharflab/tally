@@ -1,0 +1,11 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/ruby/state-paths-not-writable-as-non-root"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"
