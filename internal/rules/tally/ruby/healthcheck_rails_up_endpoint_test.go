@@ -150,6 +150,16 @@ ENV RAILS_ENV=production
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "ENTRYPOINT inherited from parent, local CMD override (independent inheritance)",
+			Content: `FROM ruby:3.3-slim AS base
+ENTRYPOINT ["puma"]
+
+FROM base AS app
+CMD ["-C", "config/puma.rb"]
+`,
+			WantViolations: 1,
+		},
 	})
 }
 

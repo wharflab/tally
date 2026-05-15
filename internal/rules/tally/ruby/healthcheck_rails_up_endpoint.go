@@ -149,39 +149,46 @@ var rubyWebServerCommands = map[string]bool{
 	"iodine":    true,
 }
 
-// stageLooksLikeRubyWebServer reports whether the stage's
-// ENTRYPOINT/CMD argv designates a Ruby HTTP server (not a worker like
-// sidekiq). When the stage doesn't declare its own CMD/ENTRYPOINT, the
-// effective values are inherited from its parent stage (`FROM <name>`),
-// so the walk continues up the parent chain inside the same Dockerfile.
-func stageLooksLikeRubyWebServer(stage instructions.Stage, sf *facts.StageFacts) bool {
-	if entry, cmd := lastEntrypointAndCmd(stage); entry != nil || cmd != nil {
-		if entry != nil && argvIncludesRubyWebServer(entry.CmdLine) {
-			return true
-		}
-		if cmd != nil && argvIncludesRubyWebServer(cmd.CmdLine) {
-			return true
-		}
-		return false
+// stageLooksLikeRubyWebServerWithParents reports whether the stage
+// runs a Ruby HTTP server, following inherited CMD/ENTRYPOINT when the
+// stage uses `FROM <named-stage>`. Docker inherits CMD and ENTRYPOINT
+// independently: if the final stage sets only CMD, the ENTRYPOINT
+// comes from the parent; if it sets only ENTRYPOINT, CMD is reset.
+// The walk resolves the effective argv for whichever instruction the
+// stage didn't override.
+func stageLooksLikeRubyWebServerWithParents(
+	input rules.LintInput, finalIdx int, stage instructions.Stage, sf *facts.StageFacts,
+) bool {
+	entry, cmd := resolveEffectiveEntrypointAndCmd(input, stage)
+	if entry != nil && argvIncludesRubyWebServer(entry.CmdLine) {
+		return true
+	}
+	if cmd != nil && argvIncludesRubyWebServer(cmd.CmdLine) {
+		return true
 	}
 	_ = sf
+	_ = finalIdx
 	return false
 }
 
-// stageLooksLikeRubyWebServerWithParents extends
-// stageLooksLikeRubyWebServer to follow inherited CMD/ENTRYPOINT when
-// the final stage uses `FROM <named-stage>` and adds no local command
-// instruction itself.
-func stageLooksLikeRubyWebServerWithParents(input rules.LintInput, finalIdx int, stage instructions.Stage, sf *facts.StageFacts) bool {
-	if stageLooksLikeRubyWebServer(stage, sf) {
-		return true
+// resolveEffectiveEntrypointAndCmd returns the effective
+// ENTRYPOINT/CMD argv for stage by walking the parent stage chain
+// inside the same Dockerfile. CMD and ENTRYPOINT are resolved
+// independently because Docker inherits them as separate slots.
+//
+// Rules per Docker semantics:
+//   - If the local stage sets ENTRYPOINT, that's the effective value
+//     and the local CMD is used (or empty if not set).
+//   - If the local stage sets only CMD, ENTRYPOINT is inherited.
+//   - If the local stage sets neither, both are inherited.
+func resolveEffectiveEntrypointAndCmd(
+	input rules.LintInput, stage instructions.Stage,
+) (*instructions.EntrypointCommand, *instructions.CmdCommand) {
+	entry, cmd := lastEntrypointAndCmd(stage)
+	if entry != nil && cmd != nil {
+		return entry, cmd
 	}
-	// Local CMD/ENTRYPOINT present but didn't match — don't fall through
-	// to the parent (Docker would not inherit when the local stage
-	// declares its own).
-	if entry, cmd := lastEntrypointAndCmd(stage); entry != nil || cmd != nil {
-		return false
-	}
+	// One or both missing — walk parent chain for the missing slot(s).
 	stagesByName := make(map[string]instructions.Stage, len(input.Stages))
 	for _, s := range input.Stages {
 		if s.Name != "" {
@@ -192,22 +199,21 @@ func stageLooksLikeRubyWebServerWithParents(input rules.LintInput, finalIdx int,
 	for range input.Stages {
 		parentStage, ok := stagesByName[strings.ToLower(parent)]
 		if !ok {
-			return false
+			return entry, cmd
 		}
-		if entry, cmd := lastEntrypointAndCmd(parentStage); entry != nil || cmd != nil {
-			if entry != nil && argvIncludesRubyWebServer(entry.CmdLine) {
-				return true
-			}
-			if cmd != nil && argvIncludesRubyWebServer(cmd.CmdLine) {
-				return true
-			}
-			// Parent has its own CMD/ENTRYPOINT but doesn't match — stop.
-			return false
+		parentEntry, parentCmd := lastEntrypointAndCmd(parentStage)
+		if entry == nil && parentEntry != nil {
+			entry = parentEntry
+		}
+		if cmd == nil && parentCmd != nil {
+			cmd = parentCmd
+		}
+		if entry != nil && cmd != nil {
+			return entry, cmd
 		}
 		parent = parentStage.BaseName
 	}
-	_ = finalIdx
-	return false
+	return entry, cmd
 }
 
 // lastEntrypointAndCmd returns the final ENTRYPOINT and CMD instructions
