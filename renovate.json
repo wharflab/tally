@@ -1,6 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:best-practices", ":gitSignOff", ":semanticCommits"],
+  "extends": [
+    "config:best-practices",
+    ":gitSignOff",
+    ":semanticCommits"
+  ],
   "dependencyDashboard": false,
   "automerge": true,
   "platformAutomerge": true,
@@ -8,9 +12,15 @@
     "enabled": true,
     "automerge": true
   },
-  "schedule": ["after 9am and before 5pm every weekday", "every weekend"],
+  "schedule": [
+    "after 9am and before 5pm every weekday",
+    "every weekend"
+  ],
   "timezone": "UTC",
-  "labels": ["dependencies", "renovate"],
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
   "commitMessagePrefix": "chore(deps):",
   "semanticCommits": "enabled",
   "rebaseWhen": "conflicted",
@@ -18,7 +28,10 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^Makefile$/", "/^\\.github/workflows/ci\\.yml$/"],
+      "managerFilePatterns": [
+        "/^Makefile$/",
+        "/^\\.github/workflows/ci\\.yml$/"
+      ],
       "matchStrings": [
         "PMD_VERSION\\s*[:=]\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)",
         "pmd-bin-(?<currentValue>\\d+\\.\\d+\\.\\d+)"
@@ -29,47 +42,72 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^Makefile$/"],
-      "matchStrings": ["DEADCODE_VERSION\\s*[:=]\\s*(?<currentValue>v\\S+)"],
+      "managerFilePatterns": [
+        "/^Makefile$/"
+      ],
+      "matchStrings": [
+        "DEADCODE_VERSION\\s*[:=]\\s*(?<currentValue>v\\S+)"
+      ],
       "depNameTemplate": "golang.org/x/tools",
       "datasourceTemplate": "go",
       "versioningTemplate": "go"
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^hk\\.pkl$/", "/^\\.github/workflows/ci\\.yml$/"],
-      "matchStrings": ["uv tool run (?<depName>[a-z0-9_-]+)==(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "managerFilePatterns": [
+        "/^hk\\.pkl$/",
+        "/^\\.github/workflows/ci\\.yml$/"
+      ],
+      "matchStrings": [
+        "uv tool run (?<depName>[a-z0-9_-]+)==(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
       "datasourceTemplate": "pypi",
       "versioningTemplate": "pep440"
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^_tools/shellcheck-wasm/versions\\.env$/"],
-      "matchStrings": ["SHELLCHECK_VERSION\\s*[:=]\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
+      "managerFilePatterns": [
+        "/^_tools/shellcheck-wasm/versions\\.env$/"
+      ],
+      "matchStrings": [
+        "SHELLCHECK_VERSION\\s*[:=]\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
+      ],
       "depNameTemplate": "koalaman/shellcheck",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^_tools/shellcheck-wasm/versions\\.env$/"],
-      "matchStrings": ["AST_GREP_VERSION\\s*[:=]\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "managerFilePatterns": [
+        "/^_tools/shellcheck-wasm/versions\\.env$/"
+      ],
+      "matchStrings": [
+        "AST_GREP_VERSION\\s*[:=]\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
       "depNameTemplate": "ast-grep/ast-grep",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^internal/psanalyzer/psscriptanalyzer\\.version$/"],
-      "matchStrings": ["^(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*$"],
+      "managerFilePatterns": [
+        "/^internal/psanalyzer/psscriptanalyzer\\.version$/"
+      ],
+      "matchStrings": [
+        "^(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*$"
+      ],
       "depNameTemplate": "PowerShell/PSScriptAnalyzer",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^_tools/shellcheck-wasm/versions\\.env$/"],
-      "matchStrings": ["GHC_WASM_META_COMMIT\\s*[:=]\\s*(?<currentDigest>[a-f0-9]{40})"],
+      "managerFilePatterns": [
+        "/^_tools/shellcheck-wasm/versions\\.env$/"
+      ],
+      "matchStrings": [
+        "GHC_WASM_META_COMMIT\\s*[:=]\\s*(?<currentDigest>[a-f0-9]{40})"
+      ],
       "currentValueTemplate": "master",
       "depNameTemplate": "https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta",
       "packageNameTemplate": "https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta.git",
@@ -77,8 +115,13 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.golangci-lint-version$/", "/^\\.custom-gcl\\.yml$/"],
-      "matchStrings": ["(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "managerFilePatterns": [
+        "/^\\.golangci-lint-version$/",
+        "/^\\.custom-gcl\\.yml$/"
+      ],
+      "matchStrings": [
+        "(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
       "depNameTemplate": "golangci/golangci-lint",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver",
@@ -87,49 +130,88 @@
   ],
   "packageRules": [
     {
-      "matchDepTypes": ["dependencies"],
+      "matchDepTypes": [
+        "dependencies"
+      ],
       "bumpVersion": "patch"
     },
     {
-      "matchFileNames": ["_integrations/vscode-tally/package.json"],
-      "matchDepNames": ["vscode"],
+      "matchFileNames": [
+        "_integrations/vscode-tally/package.json"
+      ],
+      "matchDepNames": [
+        "vscode"
+      ],
       "enabled": false
     },
     {
-      "matchFileNames": ["_integrations/vscode-tally/package.json", "_integrations/vscode-tally/bun.lock"],
-      "matchDepNames": ["@types/vscode"],
+      "matchFileNames": [
+        "_integrations/vscode-tally/package.json",
+        "_integrations/vscode-tally/bun.lock"
+      ],
+      "matchDepNames": [
+        "@types/vscode"
+      ],
       "enabled": false
     },
     {
-      "matchFileNames": ["internal/integration/testdata/**"],
+      "matchFileNames": [
+        "internal/integration/testdata/**",
+        "internal/integration/fixtures/**"
+      ],
       "enabled": false
     },
     {
-      "matchFileNames": ["packaging/**", "**/__snapshots__/**"],
+      "matchFileNames": [
+        "packaging/**",
+        "**/__snapshots__/**"
+      ],
       "enabled": false
     },
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "pinDigests": false
     },
     {
-      "matchManagers": ["pep621"],
-      "matchFileNames": ["packaging/pypi/pyproject.toml"],
-      "matchDepNames": ["python"],
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchFileNames": [
+        "packaging/pypi/pyproject.toml"
+      ],
+      "matchDepNames": [
+        "python"
+      ],
       "enabled": false
     },
     {
-      "matchDatasources": ["github-releases"],
-      "matchDepNames": ["pmd/pmd"],
+      "matchDatasources": [
+        "github-releases"
+      ],
+      "matchDepNames": [
+        "pmd/pmd"
+      ],
       "automerge": true,
       "groupName": "PMD"
     },
     {
-      "matchManagers": ["gomod"],
-      "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false,
-      "labels": ["dependencies", "renovate", "go-major-update"],
-      "postUpdateOptions": ["gomodTidy"]
+      "labels": [
+        "dependencies",
+        "renovate",
+        "go-major-update"
+      ],
+      "postUpdateOptions": [
+        "gomodTidy"
+      ]
     }
   ]
 }

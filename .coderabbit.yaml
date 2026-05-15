@@ -93,6 +93,7 @@ reviews:
         Simply acknowledge these are test fixtures and skip detailed review.
   path_filters:
     - '!**/internal/integration/testdata/**'
+    - '!**/internal/integration/fixtures/**'
     - '!CHANGELOG.md'
 chat:
   auto_reply: true
