@@ -139,6 +139,17 @@ CMD ["bin/rails", "server"]
 `,
 			WantViolations: 0,
 		},
+		// --- CMD inheritance from earlier stage ---
+		{
+			Name: "CMD inherited from named parent stage triggers",
+			Content: `FROM ruby:3.3-slim AS base
+CMD ["bin/rails", "server"]
+
+FROM base AS app
+ENV RAILS_ENV=production
+`,
+			WantViolations: 1,
+		},
 	})
 }
 

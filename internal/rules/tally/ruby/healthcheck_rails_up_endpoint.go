@@ -64,10 +64,11 @@ func (r *HealthcheckRailsUpEndpointRule) Check(input rules.LintInput) []rules.Vi
 	if !stageLooksLikeRuby(input.Semantic, finalIdx, stage, sf) {
 		return nil
 	}
-	if !stageLooksLikeRubyWebServer(stage, sf) {
+	if !stageLooksLikeRubyWebServerWithParents(input, finalIdx, stage, sf) {
 		// Workers (sidekiq/resque) don't expose an HTTP endpoint; the
 		// `/up` healthcheck recommendation only applies to Rails web
-		// servers.
+		// servers. The walk also follows inherited CMD/ENTRYPOINT when
+		// the final stage builds on a named parent stage.
 		return nil
 	}
 
@@ -150,8 +151,68 @@ var rubyWebServerCommands = map[string]bool{
 
 // stageLooksLikeRubyWebServer reports whether the stage's
 // ENTRYPOINT/CMD argv designates a Ruby HTTP server (not a worker like
-// sidekiq).
+// sidekiq). When the stage doesn't declare its own CMD/ENTRYPOINT, the
+// effective values are inherited from its parent stage (`FROM <name>`),
+// so the walk continues up the parent chain inside the same Dockerfile.
 func stageLooksLikeRubyWebServer(stage instructions.Stage, sf *facts.StageFacts) bool {
+	if entry, cmd := lastEntrypointAndCmd(stage); entry != nil || cmd != nil {
+		if entry != nil && argvIncludesRubyWebServer(entry.CmdLine) {
+			return true
+		}
+		if cmd != nil && argvIncludesRubyWebServer(cmd.CmdLine) {
+			return true
+		}
+		return false
+	}
+	_ = sf
+	return false
+}
+
+// stageLooksLikeRubyWebServerWithParents extends
+// stageLooksLikeRubyWebServer to follow inherited CMD/ENTRYPOINT when
+// the final stage uses `FROM <named-stage>` and adds no local command
+// instruction itself.
+func stageLooksLikeRubyWebServerWithParents(input rules.LintInput, finalIdx int, stage instructions.Stage, sf *facts.StageFacts) bool {
+	if stageLooksLikeRubyWebServer(stage, sf) {
+		return true
+	}
+	// Local CMD/ENTRYPOINT present but didn't match — don't fall through
+	// to the parent (Docker would not inherit when the local stage
+	// declares its own).
+	if entry, cmd := lastEntrypointAndCmd(stage); entry != nil || cmd != nil {
+		return false
+	}
+	stagesByName := make(map[string]instructions.Stage, len(input.Stages))
+	for _, s := range input.Stages {
+		if s.Name != "" {
+			stagesByName[strings.ToLower(s.Name)] = s
+		}
+	}
+	parent := stage.BaseName
+	for range input.Stages {
+		parentStage, ok := stagesByName[strings.ToLower(parent)]
+		if !ok {
+			return false
+		}
+		if entry, cmd := lastEntrypointAndCmd(parentStage); entry != nil || cmd != nil {
+			if entry != nil && argvIncludesRubyWebServer(entry.CmdLine) {
+				return true
+			}
+			if cmd != nil && argvIncludesRubyWebServer(cmd.CmdLine) {
+				return true
+			}
+			// Parent has its own CMD/ENTRYPOINT but doesn't match — stop.
+			return false
+		}
+		parent = parentStage.BaseName
+	}
+	_ = finalIdx
+	return false
+}
+
+// lastEntrypointAndCmd returns the final ENTRYPOINT and CMD instructions
+// declared in stage (Docker uses the last of each).
+func lastEntrypointAndCmd(stage instructions.Stage) (*instructions.EntrypointCommand, *instructions.CmdCommand) {
 	var lastEntrypoint *instructions.EntrypointCommand
 	var lastCmd *instructions.CmdCommand
 	for _, c := range stage.Commands {
@@ -162,14 +223,7 @@ func stageLooksLikeRubyWebServer(stage instructions.Stage, sf *facts.StageFacts)
 			lastCmd = cc
 		}
 	}
-	if lastEntrypoint != nil && argvIncludesRubyWebServer(lastEntrypoint.CmdLine) {
-		return true
-	}
-	if lastCmd != nil && argvIncludesRubyWebServer(lastCmd.CmdLine) {
-		return true
-	}
-	_ = sf
-	return false
+	return lastEntrypoint, lastCmd
 }
 
 // argvIncludesRubyWebServer reports whether any argv token's basename
