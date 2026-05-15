@@ -207,6 +207,79 @@ func TestLoad_ReadErrorsTreatedAsAbsent(t *testing.T) {
 	}
 }
 
+func TestLoad_EncryptedCredentials_NotPresent(t *testing.T) {
+	t.Parallel()
+
+	reader := &fakeReader{files: map[string][]byte{}}
+	facts := Load(reader)
+
+	if facts.HasEncryptedCredentials {
+		t.Errorf("HasEncryptedCredentials = true, want false")
+	}
+	if len(facts.EncryptedCredentialsPaths) != 0 {
+		t.Errorf("EncryptedCredentialsPaths = %v, want empty", facts.EncryptedCredentialsPaths)
+	}
+}
+
+func TestLoad_EncryptedCredentials_RootFile(t *testing.T) {
+	t.Parallel()
+
+	reader := &fakeReader{
+		files: map[string][]byte{
+			credentialsEncFilePath: []byte("encrypted-blob"),
+		},
+	}
+	facts := Load(reader)
+
+	if !facts.HasEncryptedCredentials {
+		t.Errorf("HasEncryptedCredentials = false, want true")
+	}
+	if got, want := len(facts.EncryptedCredentialsPaths), 1; got != want {
+		t.Fatalf("len(EncryptedCredentialsPaths) = %d, want %d", got, want)
+	}
+	if facts.EncryptedCredentialsPaths[0] != credentialsEncFilePath {
+		t.Errorf("EncryptedCredentialsPaths[0] = %q, want %q",
+			facts.EncryptedCredentialsPaths[0], credentialsEncFilePath)
+	}
+}
+
+func TestLoad_EncryptedCredentials_PerEnvironment(t *testing.T) {
+	t.Parallel()
+
+	reader := &fakeReader{
+		files: map[string][]byte{
+			"config/credentials/production.yml.enc": []byte("encrypted-blob"),
+			"config/credentials/staging.yml.enc":    []byte("encrypted-blob"),
+		},
+	}
+	facts := Load(reader)
+
+	if !facts.HasEncryptedCredentials {
+		t.Errorf("HasEncryptedCredentials = false, want true")
+	}
+	if len(facts.EncryptedCredentialsPaths) != 2 {
+		t.Errorf("EncryptedCredentialsPaths = %v, want 2 entries",
+			facts.EncryptedCredentialsPaths)
+	}
+}
+
+func TestLoad_EncryptedCredentials_DockerignoredSkipped(t *testing.T) {
+	t.Parallel()
+
+	reader := &fakeReader{
+		files: map[string][]byte{
+			credentialsEncFilePath: []byte("encrypted-blob"),
+		},
+		ignored: map[string]bool{
+			credentialsEncFilePath: true,
+		},
+	}
+	facts := Load(reader)
+	if facts.HasEncryptedCredentials {
+		t.Errorf("HasEncryptedCredentials = true, want false (file is .dockerignored)")
+	}
+}
+
 func TestExtractRubyVersionFromLockfile(t *testing.T) {
 	t.Parallel()
 

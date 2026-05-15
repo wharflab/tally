@@ -107,6 +107,26 @@ func lintCases(t *testing.T) []lintCase {
 			useContext: true,
 		},
 		{
+			// Context-aware refinement for tally/ruby/asset-precompile-without-dummy-key:
+			// Gemfile.lock shows Rails 7.0 (older than 7.1), so the rule should
+			// emit FixSuggestion (not FixSafe) and recommend BuildKit secret mounts.
+			name:       "ruby-asset-precompile-rails-old",
+			dir:        "ruby-asset-precompile-rails-old",
+			args:       append([]string{"--format", "json"}, mustSelectRules("tally/ruby/asset-precompile-without-dummy-key")...),
+			wantExit:   1,
+			useContext: true,
+		},
+		{
+			// Context-aware refinement for tally/ruby/asset-precompile-without-dummy-key:
+			// No Rails encrypted credentials file exists, so the rule should
+			// demote severity from warning to info.
+			name:       "ruby-asset-precompile-no-credentials",
+			dir:        "ruby-asset-precompile-no-credentials",
+			args:       append([]string{"--format", "json"}, mustSelectRules("tally/ruby/asset-precompile-without-dummy-key")...),
+			wantExit:   1,
+			useContext: true,
+		},
+		{
 			name:  "discovery-directory",
 			dir:   "discovery-directory",
 			args:  append([]string{"--format", "json"}, mustSelectRules("tally/max-lines")...),

@@ -1,0 +1,9 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/ruby/asset-precompile-without-dummy-key"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"
