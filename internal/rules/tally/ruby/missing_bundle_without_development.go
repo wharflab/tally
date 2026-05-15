@@ -149,7 +149,8 @@ func (r *MissingBundleWithoutDevelopmentRule) checkStage(
 
 func missingBundleWithoutDevelopmentDetail() string {
 	return "Production stages that run `bundle install` should exclude the `development` gem group via " +
-		"`ENV BUNDLE_WITHOUT=\"development\"` (or `bundle config set --local without development`). " +
+		"`ENV BUNDLE_WITHOUT=\"development\"` (or `bundle config set --local without development`, or " +
+		"the Bundler 2.5+ inverse selector `ENV BUNDLE_ONLY=\"default:production\"`). " +
 		"Otherwise gems like `web-console`, `byebug`, `pry`, `rspec-rails`, `letter_opener`, and `bullet` ship " +
 		"into the production image, inflating size and exposing development-only attack surface " +
 		"(`web-console` in particular has documented RCE history when it leaks into production)."

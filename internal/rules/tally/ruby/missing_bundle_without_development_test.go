@@ -3,6 +3,7 @@ package ruby
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"strings"
 	"testing"
 
@@ -489,7 +490,7 @@ func (m *mockRubyBuildContext) FileExists(p string) bool {
 func (m *mockRubyBuildContext) ReadFile(p string) ([]byte, error) {
 	content, ok := m.files[p]
 	if !ok {
-		return nil, fmt.Errorf("missing file %q", p)
+		return nil, fmt.Errorf("missing file %q: %w", p, fs.ErrNotExist)
 	}
 	return []byte(content), nil
 }
@@ -524,7 +525,12 @@ func TestMockRubyBuildContext_ReadFileMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
-	if !errors.Is(err, err) {
-		t.Fatal("error wrapping is broken — sanity check failed")
+	// Rule code uses errors.Is(err, fs.ErrNotExist) on read errors
+	// (via `if errors.Is(err, fs.ErrNotExist)` in the upstream
+	// internal/context.BuildContext) — verify the mock returns a
+	// fs.ErrNotExist-compatible error so context-aware tests don't
+	// accidentally pass with a different sentinel.
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("mock ReadFile error should match fs.ErrNotExist; got %v", err)
 	}
 }
