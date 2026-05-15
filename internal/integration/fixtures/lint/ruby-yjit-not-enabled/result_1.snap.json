@@ -1,0 +1,60 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-yjit-not-enabled/Dockerfile",
+      "violations": [
+        {
+          "detail": "YJIT is Ruby 3.3+'s production-ready JIT compiler. On most Rails workloads it delivers a 15–30% CPU win at near-zero cost — but it is opt-in. Enable it via `ENV RUBY_YJIT_ENABLE=\"1\"` or by passing `--yjit` to the server entrypoint. The corpus shows only 3 of 196 Rails Dockerfiles do this; for projects on Ruby 3.3+ this is a near-free performance gain.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/yjit-not-enabled-on-supported-runtime/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/ruby-yjit-not-enabled/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "Ruby 3.3+ runtime does not enable YJIT (RUBY_YJIT_ENABLE=1)",
+          "rule": "tally/ruby/yjit-not-enabled-on-supported-runtime",
+          "severity": "info",
+          "sourceCode": "FROM ruby:3.3-slim",
+          "suggestedFix": {
+            "description": "Add ENV RUBY_YJIT_ENABLE=\"1\" to enable YJIT on this Ruby 3.3+ runtime",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 3
+                  },
+                  "file": "fixtures/lint/ruby-yjit-not-enabled/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 3
+                  }
+                },
+                "newText": "ENV RUBY_YJIT_ENABLE=\"1\"\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}
