@@ -73,6 +73,17 @@ func (r *HealthcheckRailsUpEndpointRule) Check(input rules.LintInput) []rules.Vi
 
 	healthCheck := findLastHealthCheck(stage)
 	if healthCheck == nil {
+		// HEALTHCHECK can be inherited from an earlier stage that this
+		// final stage `FROM`s. Walk the parent chain inside the same
+		// Dockerfile to see if a parent stage already has one.
+		// (Inheritance from the upstream image content can't be checked
+		// from the Dockerfile alone, but the official Ruby base images
+		// don't ship with a HEALTHCHECK, and this rule is gated on
+		// Ruby-shaped final stages — so this remains a useful trigger
+		// in practice.)
+		if priorStageHasHealthCheck(input, stage) {
+			return nil
+		}
 		// Variant 1: no HEALTHCHECK at all on a Rails-app runtime stage.
 		loc := finalStageFromLocation(input, finalIdx)
 		v := rules.NewViolation(loc, meta.Code, meta.Description, meta.DefaultSeverity).
@@ -122,8 +133,11 @@ func curlBasedHealthCheckDetail() string {
 // makes sense. Workers (`sidekiq`, `resque`) listen on a queue, not a
 // port, so probing them for HTTP would surface a permanently failing
 // healthcheck.
+//
+// `rails` is special: bare `rails` or `rails server` is a web server,
+// but `rails db:migrate` / `rails runner` / `rails console` are
+// one-shot jobs. See `argvIncludesRubyWebServer` for the filter.
 var rubyWebServerCommands = map[string]bool{
-	"rails":     true,
 	"puma":      true,
 	"unicorn":   true,
 	"thrust":    true,
@@ -160,11 +174,35 @@ func stageLooksLikeRubyWebServer(stage instructions.Stage, sf *facts.StageFacts)
 
 // argvIncludesRubyWebServer reports whether any argv token's basename
 // matches a Ruby HTTP server name.
+//
+// `rails` requires special handling: `rails server` (or bare `rails`,
+// which prints help and exits, so unlikely as final CMD) are
+// web-serving commands, but `rails db:migrate`, `rails runner`,
+// `rails console`, etc. are one-shot jobs that don't expose HTTP.
 func argvIncludesRubyWebServer(argv []string) bool {
+	// Build a flat list of words for sequential look-ahead at `rails`
+	// matches.
+	var words []string
 	for _, token := range argv {
 		for word := range strings.FieldsSeq(token) {
-			if rubyWebServerCommands[strings.ToLower(commandBasename(word))] {
-				return true
+			words = append(words, word)
+		}
+	}
+	for i, word := range words {
+		basename := strings.ToLower(commandBasename(word))
+		if rubyWebServerCommands[basename] {
+			return true
+		}
+		if basename == railsServerCommand {
+			// Treat `rails` as a web server only when followed by
+			// `server` (or `s`, the canonical alias). Anything else —
+			// `db:migrate`, `runner`, `console`, etc. — is a one-shot
+			// job and shouldn't get the `/up` healthcheck advice.
+			if i+1 < len(words) {
+				next := strings.ToLower(words[i+1])
+				if next == "server" || next == "s" {
+					return true
+				}
 			}
 		}
 	}
@@ -181,6 +219,36 @@ func findLastHealthCheck(stage instructions.Stage) *instructions.HealthCheckComm
 		}
 	}
 	return last
+}
+
+// priorStageHasHealthCheck reports whether stage's parent (`FROM
+// <name>` resolves to another stage in the same Dockerfile) — or any
+// ancestor reachable via the `FROM <stage>` chain — declares a
+// HEALTHCHECK that this stage would inherit. The walk is bounded by
+// the number of stages and stops at the first stage whose `From` is
+// an external image (not a stage name in the same Dockerfile).
+func priorStageHasHealthCheck(input rules.LintInput, stage instructions.Stage) bool {
+	parent := stage.BaseName
+	if parent == "" {
+		return false
+	}
+	stagesByName := make(map[string]instructions.Stage, len(input.Stages))
+	for _, s := range input.Stages {
+		if s.Name != "" {
+			stagesByName[strings.ToLower(s.Name)] = s
+		}
+	}
+	for range input.Stages {
+		parentStage, ok := stagesByName[strings.ToLower(parent)]
+		if !ok {
+			return false
+		}
+		if findLastHealthCheck(parentStage) != nil {
+			return true
+		}
+		parent = parentStage.BaseName
+	}
+	return false
 }
 
 // healthCheckUsesCurlOrWget reports whether the HEALTHCHECK CMD's

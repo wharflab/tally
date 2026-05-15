@@ -106,6 +106,39 @@ CMD ["bin/rails", "server"]
 `,
 			WantViolations: 0,
 		},
+		// --- Rails subcommand filter ---
+		{
+			Name: "rails db:migrate is a one-shot job, not a web server",
+			Content: `FROM ruby:3.3-slim
+CMD ["bin/rails", "db:migrate"]
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "rails runner is a one-shot job, not a web server",
+			Content: `FROM ruby:3.3-slim
+CMD ["bin/rails", "runner", "Job.perform_now"]
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "rails server (alias 's') is a web server",
+			Content: `FROM ruby:3.3-slim
+CMD ["bin/rails", "s"]
+`,
+			WantViolations: 1,
+		},
+		// --- HEALTHCHECK inheritance from earlier stage ---
+		{
+			Name: "HEALTHCHECK inherited from named parent stage suppresses",
+			Content: `FROM ruby:3.3-slim AS base
+HEALTHCHECK CMD ["ruby", "-rnet/http", "-e", "exit 0"]
+
+FROM base AS app
+CMD ["bin/rails", "server"]
+`,
+			WantViolations: 0,
+		},
 	})
 }
 
