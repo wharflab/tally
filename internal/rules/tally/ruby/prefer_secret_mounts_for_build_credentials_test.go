@@ -1,0 +1,101 @@
+package ruby
+
+import (
+	"testing"
+
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/testutil"
+)
+
+func TestPreferSecretMountsForBuildCredentialsRule_Metadata(t *testing.T) {
+	t.Parallel()
+
+	meta := NewPreferSecretMountsForBuildCredentialsRule().Metadata()
+	if meta.Code != PreferSecretMountsForBuildCredentialsRuleCode {
+		t.Errorf("Code = %q, want %q", meta.Code, PreferSecretMountsForBuildCredentialsRuleCode)
+	}
+	if meta.DefaultSeverity != rules.SeverityInfo {
+		t.Errorf("DefaultSeverity = %v, want Info", meta.DefaultSeverity)
+	}
+	if meta.Category != "security" {
+		t.Errorf("Category = %q, want %q", meta.Category, "security")
+	}
+}
+
+func TestPreferSecretMountsForBuildCredentialsRule_Check(t *testing.T) {
+	t.Parallel()
+
+	testutil.RunRuleTests(t, NewPreferSecretMountsForBuildCredentialsRule(), []testutil.RuleTestCase{
+		// --- Violations: well-known credential env vars ---
+		{
+			Name: "ENV BUNDLE_GITHUB__COM triggers",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_GITHUB__COM="user:token"
+RUN bundle install
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "ARG BUNDLE_GITHUB__COM triggers",
+			Content: `FROM ruby:3.3-slim
+ARG BUNDLE_GITHUB__COM
+RUN bundle install
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "ENV GEM_HOST_API_KEY triggers",
+			Content: `FROM ruby:3.3-slim
+ENV GEM_HOST_API_KEY="abc123"
+RUN gem push some.gem
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "ENV NPM_TOKEN triggers (used during yarn install for asset compile)",
+			Content: `FROM ruby:3.3-slim
+ENV NPM_TOKEN="abc123"
+RUN yarn install
+`,
+			WantViolations: 1,
+		},
+		// --- Violations: BUNDLE_<HOST>__<TLD> generic pattern ---
+		{
+			Name: "ARG BUNDLE_GEMS__MYCOMPANY__COM triggers (generic Bundler host pattern)",
+			Content: `FROM ruby:3.3-slim
+ARG BUNDLE_GEMS__MYCOMPANY__COM
+`,
+			WantViolations: 1,
+		},
+		// --- meta-ARG (before any FROM) ---
+		{
+			Name: "meta-ARG BUNDLE_GITHUB__COM triggers",
+			Content: `ARG BUNDLE_GITHUB__COM
+FROM ruby:3.3-slim
+`,
+			WantViolations: 1,
+		},
+		// --- Suppressions ---
+		{
+			Name: "non-credential ENV (BUNDLE_PATH) does not trigger (no host pattern)",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_PATH="/usr/local/bundle"
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "non-Bundler ENV does not trigger",
+			Content: `FROM ruby:3.3-slim
+ENV RAILS_ENV="production"
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "dev stage skipped",
+			Content: `FROM ruby:3.3-slim AS dev
+ENV BUNDLE_GITHUB__COM="user:token"
+`,
+			WantViolations: 0,
+		},
+	})
+}
