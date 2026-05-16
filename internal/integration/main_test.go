@@ -3,6 +3,7 @@ package integration
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
@@ -33,6 +34,30 @@ var mockRegistryDomains = []string{
 	"quay.io",
 	"public.ecr.aws",
 	"dhi.io",
+}
+
+type registrySetup struct {
+	confPath        string
+	imageConfigPath string
+}
+
+type integrationTestImageConfigFile struct {
+	Images map[string]integrationTestImageEntry `json:"images"`
+}
+
+type integrationTestImageEntry struct {
+	Configs []integrationTestImageConfig `json:"configs"`
+	Delay   string                       `json:"delay,omitempty"`
+}
+
+type integrationTestImageConfig struct {
+	Env            map[string]string `json:"env,omitempty"`
+	OS             string            `json:"os"`
+	Arch           string            `json:"arch"`
+	Variant        string            `json:"variant,omitempty"`
+	HasHealthcheck bool              `json:"hasHealthcheck,omitempty"`
+	WorkingDir     string            `json:"workingDir,omitempty"`
+	Shell          []string          `json:"shell,omitempty"`
 }
 
 var errNoRulesSelected = errors.New("selectRules requires at least one rule")
@@ -74,7 +99,7 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 		wg              sync.WaitGroup
 		binErr, acpErr  error
 		registryErr     error
-		registryTmpConf string
+		registryTmpConf registrySetup
 	)
 	wg.Go(func() {
 		binErr = buildIntegrationBinary(tmpDir)
@@ -304,7 +329,7 @@ func copyFileExclusive(src, dst string) error {
 // `go build` invocations. Image pushes run concurrently against the
 // in-memory registry; AddImage / AddIndex are independent calls and the
 // registry handler is goroutine-safe.
-func prepareMockRegistry(tmpDir string) (string, error) {
+func prepareMockRegistry(tmpDir string) (registrySetup, error) {
 	mockRegistry = testutil.New()
 
 	type imageJob struct {
@@ -461,7 +486,7 @@ func prepareMockRegistry(tmpDir string) (string, error) {
 	wg.Wait()
 	if err := errors.Join(errs...); err != nil {
 		mockRegistry.Close()
-		return "", err
+		return registrySetup{}, err
 	}
 
 	// Write registries.conf redirecting every registry our fixtures touch
@@ -476,21 +501,128 @@ func prepareMockRegistry(tmpDir string) (string, error) {
 	confPath, err := mockRegistry.WriteRegistriesConf(tmpDir, mockRegistryDomains...)
 	if err != nil {
 		mockRegistry.Close()
-		return "", fmt.Errorf("create registries.conf: %w", err)
+		return registrySetup{}, fmt.Errorf("create registries.conf: %w", err)
 	}
-	return confPath, nil
+	imageConfigPath, err := writeIntegrationTestImageConfigs(tmpDir)
+	if err != nil {
+		mockRegistry.Close()
+		return registrySetup{}, err
+	}
+	return registrySetup{confPath: confPath, imageConfigPath: imageConfigPath}, nil
+}
+
+func writeIntegrationTestImageConfigs(tmpDir string) (string, error) {
+	path := filepath.Join(tmpDir, "test-image-configs.json")
+	data, err := json.Marshal(integrationTestImageConfigFile{Images: integrationTestImageConfigs()})
+	if err != nil {
+		return "", fmt.Errorf("marshal test image configs: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", fmt.Errorf("write test image configs: %w", err)
+	}
+	return path, nil
+}
+
+func integrationTestImageConfigs() map[string]integrationTestImageEntry {
+	linuxEnv := map[string]string{"PATH": "/usr/local/bin:/usr/bin:/bin"}
+	pythonEnv := map[string]string{
+		"PATH":           "/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"PYTHON_VERSION": "3.12.0",
+		"LANG":           "C.UTF-8",
+	}
+
+	linuxArm := func(env map[string]string) integrationTestImageConfig {
+		return integrationTestImageConfig{OS: "linux", Arch: "arm64", Env: env}
+	}
+	windowsAmd := func() integrationTestImageConfig {
+		return integrationTestImageConfig{OS: "windows", Arch: "amd64", Env: linuxEnv}
+	}
+
+	images := map[string]integrationTestImageEntry{
+		"docker.io/library/python:3.12": {
+			Configs: []integrationTestImageConfig{linuxArm(pythonEnv)},
+		},
+		"docker.io/library/multiarch:latest": {
+			Configs: []integrationTestImageConfig{
+				{OS: "linux", Arch: "amd64", Env: linuxEnv},
+				{OS: "linux", Arch: "arm64", Env: linuxEnv},
+			},
+		},
+		"docker.io/library/withhealthcheck:latest": {
+			Configs: []integrationTestImageConfig{{
+				OS:             "linux",
+				Arch:           "arm64",
+				Env:            linuxEnv,
+				HasHealthcheck: true,
+			}},
+		},
+		"docker.io/library/slowfailfast:latest": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+			Delay:   "30s",
+		},
+		"docker.io/library/slowtimeout:latest": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+			Delay:   "30s",
+		},
+		"docker.io/library/php:5.6-fpm": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"mcr.microsoft.com/powershell:6.2.1-alpine-3.8": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"mcr.microsoft.com/powershell:7.4-ubuntu-22.04": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"mcr.microsoft.com/powershell:ubuntu-22.04": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"mcr.microsoft.com/windows/servercore:ltsc2022": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"mcr.microsoft.com/windows/servercore:ltsc2025": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"mcr.microsoft.com/windows/servercore/iis:windowsservercore-ltsc2019": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2019": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"mcr.microsoft.com/dotnet/sdk:8.0": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"quay.io/prometheus/node-exporter:latest": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"public.ecr.aws/lambda/python:3.12": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"docker.io/teeks99/msvc-win:14.0": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"docker.io/pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"docker.io/openresty/openresty:alpine": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"dhi.io/debian-base:trixie-dev": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+	}
+	return images
 }
 
 // finalizeMockRegistry publishes the env vars that point tally at the mock
 // registry and resets the recorded requests so only test-time pulls show up.
 // Must run on the goroutine that started TestMain (after concurrent setup
 // completes) because os.Setenv mutates process-wide state.
-func finalizeMockRegistry(confPath string) error {
-	if err := os.Setenv("CONTAINERS_REGISTRIES_CONF", confPath); err != nil {
+func finalizeMockRegistry(setup registrySetup) error {
+	if err := os.Setenv("CONTAINERS_REGISTRIES_CONF", setup.confPath); err != nil {
 		mockRegistry.Close()
 		return fmt.Errorf("set CONTAINERS_REGISTRIES_CONF: %w", err)
 	}
-	if err := os.Setenv("REGISTRIES_CONFIG_PATH", confPath); err != nil {
+	if err := os.Setenv("REGISTRIES_CONFIG_PATH", setup.confPath); err != nil {
 		mockRegistry.Close()
 		return fmt.Errorf("set REGISTRIES_CONFIG_PATH: %w", err)
 	}
@@ -498,11 +630,16 @@ func finalizeMockRegistry(confPath string) error {
 		mockRegistry.Close()
 		return fmt.Errorf("set TALLY_TEST_REGISTRY_HOST_OVERRIDES: %w", err)
 	}
-	registryEnv = make([]string, 0, 4)
+	if err := os.Setenv("TALLY_TEST_IMAGE_CONFIGS", setup.imageConfigPath); err != nil {
+		mockRegistry.Close()
+		return fmt.Errorf("set TALLY_TEST_IMAGE_CONFIGS: %w", err)
+	}
+	registryEnv = make([]string, 0, 5)
 	registryEnv = append(registryEnv,
-		"CONTAINERS_REGISTRIES_CONF="+confPath,
-		"REGISTRIES_CONFIG_PATH="+confPath,
+		"CONTAINERS_REGISTRIES_CONF="+setup.confPath,
+		"REGISTRIES_CONFIG_PATH="+setup.confPath,
 		"TALLY_TEST_REGISTRY_HOST_OVERRIDES="+mockRegistryHostOverrides(),
+		"TALLY_TEST_IMAGE_CONFIGS="+setup.imageConfigPath,
 	)
 	// Set default platform to match the mock registry's image platform (linux/arm64).
 	if err := os.Setenv("DOCKER_DEFAULT_PLATFORM", "linux/arm64"); err != nil {

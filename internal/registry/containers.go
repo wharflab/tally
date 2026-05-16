@@ -27,6 +27,9 @@ import (
 
 func init() {
 	NewDefaultResolver = func() ImageResolver {
+		if resolver := newTestImageResolverFromEnv(); resolver != nil {
+			return resolver
+		}
 		return NewContainersResolver()
 	}
 }

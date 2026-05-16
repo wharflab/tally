@@ -8,6 +8,7 @@ go_library(
         "factory.go",
         "oci.go",
         "resolver.go",
+        "test_env_resolver.go",
     ],
     importpath = "github.com/wharflab/tally/internal/registry",
     visibility = ["//:__subpackages__"],
