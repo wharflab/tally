@@ -14,7 +14,7 @@ func TestRunfilesManifestParsesEscapedAndLineOnlyEntries(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "MANIFEST")
 	if err := os.WriteFile(
 		manifestPath,
-		[]byte("dir\\swith\\sspaces /tmp/target with spaces\nline-only-entry\n h/\\n\\bi /tmp/\\snewline\\nbackslash\\b\n"),
+		[]byte(" dir\\swith\\sspaces /tmp/target\\swith\\sspaces\nline-only-entry\n h/\\n\\bi /tmp/\\snewline\\nbackslash\\b\n"),
 		0o600,
 	); err != nil {
 		t.Fatal(err)
@@ -37,6 +37,21 @@ func TestRunfilesManifestParsesEscapedAndLineOnlyEntries(t *testing.T) {
 	}
 }
 
+func TestRunfilesManifestPreservesUnescapedWindowsPaths(t *testing.T) {
+	t.Parallel()
+
+	key, value, ok := parseManifestLine(`workspace/file C:\tmp\source.txt`)
+	if !ok {
+		t.Fatal("expected key/value manifest line")
+	}
+	if key != "workspace/file" {
+		t.Fatalf("key mismatch: %q", key)
+	}
+	if value != `C:\tmp\source.txt` {
+		t.Fatalf("value mismatch: %q", value)
+	}
+}
+
 func TestCopyTreeCopiesManifestPrefixWithEscapedKey(t *testing.T) {
 	resetManifestCache()
 	t.Cleanup(resetManifestCache)
@@ -47,7 +62,8 @@ func TestCopyTreeCopiesManifestPrefixWithEscapedKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	manifestPath := filepath.Join(tmpDir, "MANIFEST")
-	if err := os.WriteFile(manifestPath, []byte("dir\\swith\\sspaces/nested/file.txt "+src+"\n"), 0o600); err != nil {
+	manifestLine := " dir\\swith\\sspaces/nested/file.txt " + escapeManifestPath(src) + "\n"
+	if err := os.WriteFile(manifestPath, []byte(manifestLine), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("RUNFILES_MANIFEST_FILE", manifestPath)
@@ -71,4 +87,21 @@ func resetManifestCache() {
 	manifestCache.once = sync.Once{}
 	manifestCache.data = nil
 	manifestCache.err = nil
+}
+
+func escapeManifestPath(path string) string {
+	var b []rune
+	for _, r := range path {
+		switch r {
+		case ' ':
+			b = append(b, '\\', 's')
+		case '\n':
+			b = append(b, '\\', 'n')
+		case '\\':
+			b = append(b, '\\', 'b')
+		default:
+			b = append(b, r)
+		}
+	}
+	return string(b)
 }

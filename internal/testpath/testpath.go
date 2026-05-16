@@ -206,11 +206,10 @@ func parseManifestLine(line string) (string, string, bool) {
 		return unescapeManifestPath(key), unescapeManifestPath(value), true
 	}
 	key, value, ok := strings.Cut(line, " ")
-	key = unescapeManifestPath(key)
 	if !ok {
 		return key, key, false
 	}
-	return key, unescapeManifestPath(value), true
+	return key, value, true
 }
 
 func unescapeManifestPath(path string) string {
