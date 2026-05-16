@@ -68,6 +68,11 @@ go_library(
 go_binary(
     name = "tally",
     embed = [":go_default_library"],
+    # Match the historical shipped binary shape from `go build -ldflags "-s -w"`.
+    gc_linkopts = [
+        "-s",
+        "-w",
+    ],
     pure = "off",
     visibility = ["//visibility:public"],
     x_defs = {
