@@ -11,6 +11,7 @@ import (
 
 func integrationCommandEnv(extra ...string) []string {
 	env := append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	env = appendEnvOverrides(env, registryEnv...)
 	env = appendDiscoveredPowerShellEnv(env)
 	return append(env, extra...)
 }
@@ -159,6 +160,18 @@ func appendEnvOverride(env []string, key, value string) []string {
 		out = append(out, entry)
 	}
 	return append(out, key+"="+value)
+}
+
+func appendEnvOverrides(env []string, overrides ...string) []string {
+	out := env
+	for _, override := range overrides {
+		key, value, ok := strings.Cut(override, "=")
+		if !ok {
+			continue
+		}
+		out = appendEnvOverride(out, key, value)
+	}
+	return out
 }
 
 func dedupeNonEmpty(values []string) []string {

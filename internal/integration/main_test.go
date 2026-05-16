@@ -24,6 +24,7 @@ var (
 	mockRegistry *testutil.MockRegistry
 	acpAgentPath string
 	testTmpDir   string
+	registryEnv  []string
 )
 
 var mockRegistryDomains = []string{
@@ -497,11 +498,18 @@ func finalizeMockRegistry(confPath string) error {
 		mockRegistry.Close()
 		return fmt.Errorf("set TALLY_TEST_REGISTRY_HOST_OVERRIDES: %w", err)
 	}
+	registryEnv = make([]string, 0, 4)
+	registryEnv = append(registryEnv,
+		"CONTAINERS_REGISTRIES_CONF="+confPath,
+		"REGISTRIES_CONFIG_PATH="+confPath,
+		"TALLY_TEST_REGISTRY_HOST_OVERRIDES="+mockRegistryHostOverrides(),
+	)
 	// Set default platform to match the mock registry's image platform (linux/arm64).
 	if err := os.Setenv("DOCKER_DEFAULT_PLATFORM", "linux/arm64"); err != nil {
 		mockRegistry.Close()
 		return fmt.Errorf("set DOCKER_DEFAULT_PLATFORM: %w", err)
 	}
+	registryEnv = append(registryEnv, "DOCKER_DEFAULT_PLATFORM=linux/arm64")
 
 	// Clear setup requests (image pushes) so only test-time requests are tracked.
 	mockRegistry.ResetRequests()
