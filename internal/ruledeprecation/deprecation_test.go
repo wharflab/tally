@@ -3,9 +3,10 @@ package ruledeprecation
 import (
 	jsonv2 "encoding/json/v2"
 	"maps"
-	"os"
 	"slices"
 	"testing"
+
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 func TestLookupSupersededAlias(t *testing.T) {
@@ -93,7 +94,7 @@ func TestCollectorDeduplicatesAliases(t *testing.T) {
 func TestBuildKitCoveredHadolintRulesAreDeprecated(t *testing.T) {
 	t.Parallel()
 
-	data, err := os.ReadFile("../rules/hadolint-status.json")
+	data, err := testpath.ReadFile("../rules/hadolint-status.json")
 	if err != nil {
 		t.Fatalf("read hadolint status: %v", err)
 	}

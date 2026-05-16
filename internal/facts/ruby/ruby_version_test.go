@@ -1,9 +1,9 @@
 package ruby
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 func TestParseRubyVersionFile(t *testing.T) {
@@ -34,7 +34,7 @@ func TestParseRubyVersionFile(t *testing.T) {
 func TestParseRubyVersionFile_Testdata(t *testing.T) {
 	t.Parallel()
 
-	data, err := os.ReadFile(filepath.Join("testdata", "ruby-version.basic"))
+	data, err := testpath.ReadFile("testdata/ruby-version.basic")
 	if err != nil {
 		t.Fatalf("read testdata: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestParseToolVersionsFile(t *testing.T) {
 func TestParseToolVersionsFile_Testdata(t *testing.T) {
 	t.Parallel()
 
-	data, err := os.ReadFile(filepath.Join("testdata", "tool-versions.basic"))
+	data, err := testpath.ReadFile("testdata/tool-versions.basic")
 	if err != nil {
 		t.Fatalf("read testdata: %v", err)
 	}

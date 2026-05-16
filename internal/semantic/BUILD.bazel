@@ -44,6 +44,7 @@ go_test(
     deps = [
         "//internal/dockerfile:go_default_library",
         "//internal/shell:go_default_library",
+        "//internal/testpath:go_default_library",
         "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
         "@com_github_moby_buildkit//frontend/dockerfile/shell:go_default_library",
         "@com_github_stretchr_testify//assert:go_default_library",

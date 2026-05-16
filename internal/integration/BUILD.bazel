@@ -44,6 +44,7 @@ go_test(
         "//internal/dockerfile:go_default_library",
         "//internal/registry/testutil:go_default_library",
         "//internal/shell:go_default_library",
+        "//internal/testpath:go_default_library",
         "//internal/version:go_default_library",
         "@com_github_docker_cli//cli-plugins/metadata:go_default_library",
         "@com_github_gkampitakis_go_snaps//snaps:go_default_library",

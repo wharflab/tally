@@ -79,6 +79,7 @@ go_test(
         "//internal/registry:go_default_library",
         "//internal/rules:go_default_library",
         "//internal/rules/buildkit/fixes:go_default_library",
+        "//internal/testpath:go_default_library",
         "//internal/testutil:go_default_library",
         "@com_github_gkampitakis_go_snaps//snaps:go_default_library",
         "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",

@@ -1,11 +1,11 @@
 package ruby
 
 import (
-	"os"
-	"path/filepath"
 	"reflect"
 	"slices"
 	"testing"
+
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 func TestParseLockfile_Basic(t *testing.T) {
@@ -355,7 +355,7 @@ func TestParseLockfile_MultipleSourcesIndependent(t *testing.T) {
 
 func mustParseTestdata(t *testing.T, name string) *LockfileFacts {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", name))
+	data, err := testpath.ReadFile("testdata/" + name)
 	if err != nil {
 		t.Fatalf("read testdata %q: %v", name, err)
 	}

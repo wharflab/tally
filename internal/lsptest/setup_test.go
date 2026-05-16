@@ -6,10 +6,8 @@ import (
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
-	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +23,7 @@ import (
 	"golang.org/x/exp/jsonrpc2"
 
 	protocol "github.com/wharflab/tally/internal/lsp/protocol"
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 var (
@@ -156,72 +155,11 @@ func materializeBazelLSPWorkspace(tmpDir string) error {
 }
 
 func copyTestTree(src, dst string) error {
-	if _, err := os.Stat(src); errors.Is(err, os.ErrNotExist) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	return filepath.WalkDir(src, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(dst, rel)
-		if entry.IsDir() {
-			return os.MkdirAll(target, 0o750)
-		}
-		info, err := os.Stat(path)
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
-			return nil
-		}
-		//nolint:gosec // Test-only Bazel runfile copy; symlinks are intentionally dereferenced.
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
-			return err
-		}
-		return os.WriteFile(target, data, info.Mode().Perm())
-	})
+	return testpath.CopyTree(src, dst)
 }
 
 func resolveConfiguredTestPath(path string) string {
-	candidates := []string{path}
-	if !filepath.IsAbs(path) {
-		if absPath, err := filepath.Abs(path); err == nil {
-			candidates = append(candidates, absPath)
-		}
-		runfilesDir := os.Getenv("RUNFILES_DIR")
-		if runfilesDir == "" {
-			runfilesDir = os.Getenv("TEST_SRCDIR")
-		}
-		workspace := os.Getenv("TEST_WORKSPACE")
-		if runfilesDir != "" {
-			candidates = append(candidates, filepath.Join(runfilesDir, path))
-			if workspace != "" {
-				candidates = append(candidates, filepath.Join(runfilesDir, workspace, path))
-			}
-		}
-		if testSrcDir := os.Getenv("TEST_SRCDIR"); testSrcDir != "" && testSrcDir != runfilesDir {
-			candidates = append(candidates, filepath.Join(testSrcDir, path))
-			if workspace != "" {
-				candidates = append(candidates, filepath.Join(testSrcDir, workspace, path))
-			}
-		}
-	}
-	for _, candidate := range candidates {
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-			return candidate
-		}
-	}
-	return path
+	return testpath.Resolve(path)
 }
 
 // processIO wraps subprocess stdin/stdout as an io.ReadWriteCloser

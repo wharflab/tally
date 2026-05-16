@@ -12,4 +12,5 @@ go_test(
     srcs = ["deprecation_test.go"],
     data = ["//internal/rules:hadolint-status.json"],
     embed = [":go_default_library"],
+    deps = ["//internal/testpath:go_default_library"],
 )

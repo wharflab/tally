@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 var testAgentBin string
@@ -57,29 +59,7 @@ func buildTestAgent() (string, error) {
 }
 
 func resolveConfiguredTestPath(path string) string {
-	candidates := []string{path}
-	if !filepath.IsAbs(path) {
-		if absPath, err := filepath.Abs(path); err == nil {
-			candidates = append(candidates, absPath)
-		}
-		runfilesDir := os.Getenv("RUNFILES_DIR")
-		if runfilesDir == "" {
-			runfilesDir = os.Getenv("TEST_SRCDIR")
-		}
-		workspace := os.Getenv("TEST_WORKSPACE")
-		if runfilesDir != "" {
-			candidates = append(candidates, filepath.Join(runfilesDir, path))
-			if workspace != "" {
-				candidates = append(candidates, filepath.Join(runfilesDir, workspace, path))
-			}
-		}
-	}
-	for _, candidate := range candidates {
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-			return candidate
-		}
-	}
-	return path
+	return testpath.Resolve(path)
 }
 
 func TestRunner_HappyPath(t *testing.T) {

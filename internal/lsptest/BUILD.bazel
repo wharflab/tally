@@ -15,6 +15,7 @@ go_test(
     },
     deps = [
         "//internal/lsp/protocol:go_default_library",
+        "//internal/testpath:go_default_library",
         "@com_github_gkampitakis_go_snaps//match:go_default_library",
         "@com_github_gkampitakis_go_snaps//snaps:go_default_library",
         "@com_github_stretchr_testify//assert:go_default_library",
