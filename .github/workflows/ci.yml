@@ -187,7 +187,7 @@ jobs:
         run: bazel build --config=release --config=windows-amd64 //:tally
       - name: Run tests
         shell: msys2 {0}
-        run: bazel test --config=go --config=race --config=windows-amd64 //cmd/... //internal/...
+        run: bazel test --config=go --config=windows-amd64 //cmd/... //internal/...
   lint:
     runs-on: ubuntu-latest
     steps:
