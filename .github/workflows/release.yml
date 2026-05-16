@@ -809,6 +809,7 @@ jobs:
     env:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - vscode_target: linux-x64
@@ -883,9 +884,19 @@ jobs:
           npm version --no-git-tag-version --ignore-scripts "$CLEAN_VERSION"
       - name: Package platform-specific VSIX
         run: |
-          bazel run //_integrations/vscode-tally:package_vscode_extension -- \
-            "$PWD/_integrations/vscode-tally/tally-${{ matrix.vscode_target }}.vsix" \
-            --target "${{ matrix.vscode_target }}"
+          for attempt in 1 2 3; do
+            if bazel run //_integrations/vscode-tally:package_vscode_extension -- \
+              "$PWD/_integrations/vscode-tally/tally-${{ matrix.vscode_target }}.vsix" \
+              --target "${{ matrix.vscode_target }}"; then
+              exit 0
+            fi
+
+            if [ "${attempt}" -eq 3 ]; then
+              exit 1
+            fi
+            echo "VSIX Bazel packaging failed; retrying in $((attempt * 10)) seconds..."
+            sleep $((attempt * 10))
+          done
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v7
         with:
