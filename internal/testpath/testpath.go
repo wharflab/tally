@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
+	pathpkg "path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -37,34 +38,41 @@ func ReadFile(name string) ([]byte, error) {
 func CopyTree(src, dst string) error {
 	resolved := Resolve(src)
 	if info, err := os.Stat(resolved); err == nil {
-		if !info.IsDir() {
-			return copyFile(resolved, filepath.Join(dst, filepath.Base(src)), info.Mode().Perm())
-		}
-		return filepath.WalkDir(resolved, func(path string, entry fs.DirEntry, walkErr error) error {
-			if walkErr != nil {
-				return walkErr
-			}
-			rel, err := filepath.Rel(resolved, path)
-			if err != nil {
-				return err
-			}
-			target := filepath.Join(dst, rel)
-			if entry.IsDir() {
-				return os.MkdirAll(target, 0o750)
-			}
-			info, err := os.Stat(path)
-			if err != nil {
-				return err
-			}
-			if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
-				return nil
-			}
-			return copyFile(path, target, info.Mode().Perm())
-		})
+		return copyResolvedTree(resolved, src, dst, info)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	return copyManifestTree(src, dst)
+}
 
+func copyResolvedTree(resolved, src, dst string, info fs.FileInfo) error {
+	if !info.IsDir() {
+		return copyFile(resolved, filepath.Join(dst, filepath.Base(src)), info.Mode().Perm())
+	}
+	return filepath.WalkDir(resolved, func(filePath string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(resolved, filePath)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o750)
+		}
+		info, err := os.Stat(filePath)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
+			return nil
+		}
+		return copyFile(filePath, target, info.Mode().Perm())
+	})
+}
+
+func copyManifestTree(src, dst string) error {
 	manifest, err := runfilesManifest()
 	if err != nil {
 		return err
@@ -111,6 +119,7 @@ func copyFile(src, dst string, perm fs.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return err
 	}
+	//nolint:gosec // Test helper copies only Bazel-declared runfiles or local test data.
 	return os.WriteFile(dst, data, perm)
 }
 
@@ -142,14 +151,7 @@ func runfilesDirs() []string {
 		if dir == "" {
 			continue
 		}
-		seen := false
-		for _, existing := range out {
-			if existing == dir {
-				seen = true
-				break
-			}
-		}
-		if !seen {
+		if !slices.Contains(out, dir) {
 			out = append(out, dir)
 		}
 	}
@@ -159,11 +161,12 @@ func runfilesDirs() []string {
 func runfilesManifest() (map[string]string, error) {
 	manifestCache.once.Do(func() {
 		manifestCache.data = make(map[string]string)
-		path := os.Getenv("RUNFILES_MANIFEST_FILE")
-		if path == "" {
+		manifestPath := os.Getenv("RUNFILES_MANIFEST_FILE")
+		if manifestPath == "" {
 			return
 		}
-		file, err := os.Open(path)
+		//nolint:gosec // Bazel owns RUNFILES_MANIFEST_FILE in tests.
+		file, err := os.Open(manifestPath)
 		if err != nil {
 			manifestCache.err = err
 			return
@@ -202,17 +205,17 @@ func candidateKeys(name string) []string {
 
 	slash := filepath.ToSlash(name)
 	add(slash)
-	add(path.Clean(slash))
+	add(pathpkg.Clean(slash))
 
 	trimmed := slash
 	for strings.HasPrefix(trimmed, "../") {
 		trimmed = strings.TrimPrefix(trimmed, "../")
 		add(trimmed)
-		add(path.Clean(trimmed))
+		add(pathpkg.Clean(trimmed))
 	}
 
 	if pkg := testPackage(); pkg != "" {
-		add(path.Clean(pkg + "/" + slash))
+		add(pathpkg.Clean(pkg + "/" + slash))
 	}
 
 	base := append([]string(nil), keys...)
@@ -244,14 +247,7 @@ func workspaces() []string {
 		if name == "" {
 			continue
 		}
-		seen := false
-		for _, existing := range out {
-			if existing == name {
-				seen = true
-				break
-			}
-		}
-		if !seen {
+		if !slices.Contains(out, name) {
 			out = append(out, name)
 		}
 	}
