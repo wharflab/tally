@@ -125,7 +125,7 @@ func mustBuildkitModuleDir(t *testing.T) string {
 	if configured := os.Getenv("TALLY_GO_BINARY"); configured != "" {
 		goBinary = resolveConfiguredTestPath(configured)
 	}
-	cmd := exec.Command(goBinary, "list", "-m", "-f", "{{.Dir}}", "github.com/moby/buildkit")
+	cmd := exec.Command(goBinary, "list", "-m", "-f", "{{.Dir}}", "github.com/moby/buildkit") //nolint:gosec // Test-only Go binary is either "go" or Bazel runfile data.
 	cmd.Env = withoutEnv(os.Environ(), "GOEXPERIMENT")
 	if dir := nearestGoModuleDir(); dir != "" {
 		cmd.Dir = dir
