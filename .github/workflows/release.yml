@@ -406,13 +406,21 @@ jobs:
           while IFS= read -r ref; do
             [ -n "$ref" ] || continue
             tag="${ref##*:}"
-            TALLY_VERSION="${CLEAN_VERSION}" bazel run --config=release \
-              --embed_label="${CLEAN_VERSION}" \
-              --//:release_version="${CLEAN_VERSION}" \
-              --//:container_registry=ghcr.io \
-              --//:container_repository="${REPOSITORY}" \
-              --//:container_tag="${tag}" \
-              "${TARGET}"
+            for attempt in 1 2 3; do
+              if TALLY_VERSION="${CLEAN_VERSION}" bazel run --config=release \
+                --embed_label="${CLEAN_VERSION}" \
+                --//:release_version="${CLEAN_VERSION}" \
+                --//:container_registry=ghcr.io \
+                --//:container_repository="${REPOSITORY}" \
+                --//:container_tag="${tag}" \
+                "${TARGET}"; then
+                break
+              fi
+              if [ "${attempt}" -eq 3 ]; then
+                exit 1
+              fi
+              sleep $((attempt * 10))
+            done
           done <<< "${{ steps.meta.outputs.tags }}"
           # https://github.com/profnandaa/buildkit/blob/97b80f23f3e55861f70bb7aaf4558340af78d030/docs/windows.md#cni--networking-setup
       - name: Setup CNI
