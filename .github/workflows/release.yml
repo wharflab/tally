@@ -179,7 +179,15 @@ jobs:
           CLEAN_VERSION="${RELEASE_VERSION#v}"
           DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
           mkdir -p "${DIST_DIR}"
-          TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally
+          for attempt in 1 2 3; do
+            if TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally; then
+              break
+            fi
+            if [ "${attempt}" -eq 3 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
           BINARY="$(tools/bazel/target_output.sh --config=release --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally)"
           cp "${BINARY}" "${DIST_DIR}/${{ matrix.binary_name }}"
           chmod 755 "${DIST_DIR}/${{ matrix.binary_name }}"
@@ -192,7 +200,15 @@ jobs:
           DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
           mkdir -p "${DIST_DIR}"
           BAZEL_PLATFORM_CONFIG="windows-${{ matrix.goarch }}"
-          TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --config="${BAZEL_PLATFORM_CONFIG}" --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally
+          for attempt in 1 2 3; do
+            if TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --config="${BAZEL_PLATFORM_CONFIG}" --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally; then
+              break
+            fi
+            if [ "${attempt}" -eq 3 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
           BINARY="$(tools/bazel/target_output.sh --config=release --config="${BAZEL_PLATFORM_CONFIG}" --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally)"
           cp "${BINARY}" "${DIST_DIR}/${{ matrix.binary_name }}"
       - name: Smoke test Linux binary on host
