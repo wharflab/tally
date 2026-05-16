@@ -467,7 +467,8 @@ func TestLSP_ExecuteCommandApplyAllFixes(t *testing.T) {
 // on the same real-world Dockerfile used by TestLSP_FormattingRealWorld.
 // The VS Code smoke test uses this snapshot as the expected fix-all output.
 func TestLSP_ExecuteCommandApplyAllFixesRealWorld(t *testing.T) {
-	t.Parallel()
+	// This fixture drives iterative fix-all over a large real-world Dockerfile.
+	// Keep it serial so CI does not run it alongside every other LSP subprocess.
 	ts := startTestServer(t)
 	ts.initialize(t)
 
@@ -478,7 +479,7 @@ func TestLSP_ExecuteCommandApplyAllFixesRealWorld(t *testing.T) {
 	ts.openDocument(t, uri, string(original))
 	ts.waitDiagnostics(t)
 
-	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	var edit workspaceEdit
