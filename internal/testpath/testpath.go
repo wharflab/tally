@@ -185,6 +185,7 @@ func runfilesManifest() (map[string]string, error) {
 		for scanner.Scan() {
 			line := scanner.Text()
 			key, value, ok := parseManifestLine(line)
+			value = normalizeManifestValue(manifestPath, value)
 			if !ok {
 				manifestCache.data[key] = value
 				continue
@@ -194,6 +195,67 @@ func runfilesManifest() (map[string]string, error) {
 		manifestCache.err = scanner.Err()
 	})
 	return manifestCache.data, manifestCache.err
+}
+
+func normalizeManifestValue(manifestPath, value string) string {
+	if value == "" || filepath.IsAbs(value) {
+		return value
+	}
+	for _, base := range manifestValueBases(manifestPath) {
+		candidate := filepath.Join(base, filepath.FromSlash(value))
+		if existing(candidate) {
+			if abs, err := filepath.Abs(candidate); err == nil {
+				return abs
+			}
+			return candidate
+		}
+	}
+	return value
+}
+
+func manifestValueBases(manifestPath string) []string {
+	var out []string
+	add := func(dir string) {
+		if dir == "" {
+			return
+		}
+		if !filepath.IsAbs(dir) {
+			if abs, err := filepath.Abs(dir); err == nil {
+				dir = abs
+			}
+		}
+		dir = filepath.Clean(dir)
+		if !slices.Contains(out, dir) {
+			out = append(out, dir)
+		}
+	}
+	if wd, err := os.Getwd(); err == nil {
+		add(wd)
+	}
+	if manifestPath != "" {
+		if abs, err := filepath.Abs(manifestPath); err == nil {
+			manifestPath = abs
+		}
+		add(filepath.Dir(manifestPath))
+		add(execrootFromManifestPath(manifestPath))
+	}
+	add(os.Getenv("TEST_SRCDIR"))
+	add(os.Getenv("RUNFILES_DIR"))
+	return out
+}
+
+func execrootFromManifestPath(manifestPath string) string {
+	dir := filepath.Dir(filepath.Clean(manifestPath))
+	for {
+		if filepath.Base(dir) == "bazel-out" {
+			return filepath.Dir(dir)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
 }
 
 func parseManifestLine(line string) (string, string, bool) {

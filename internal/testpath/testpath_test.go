@@ -52,6 +52,34 @@ func TestRunfilesManifestPreservesUnescapedWindowsPaths(t *testing.T) {
 	}
 }
 
+func TestResolveUsesExecrootRelativeManifestValue(t *testing.T) {
+	resetManifestCache()
+	t.Cleanup(resetManifestCache)
+
+	tmpDir := t.TempDir()
+	execroot := filepath.Join(tmpDir, "execroot", "_main")
+	relativeTarget := filepath.ToSlash(filepath.Join("bazel-out", "k8-fastbuild", "bin", "pkg", "file.txt"))
+	targetPath := filepath.Join(execroot, filepath.FromSlash(relativeTarget))
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(targetPath, []byte("content"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(execroot, "bazel-out", "k8-fastbuild", "bin", "MANIFEST")
+	if err := os.WriteFile(manifestPath, []byte("workspace/file "+relativeTarget+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("RUNFILES_MANIFEST_FILE", manifestPath)
+	t.Setenv("TEST_WORKSPACE", "")
+	t.Setenv("TEST_TARGET", "")
+
+	got := Resolve("workspace/file")
+	if got != targetPath {
+		t.Fatalf("resolved path mismatch: got %q want %q", got, targetPath)
+	}
+}
+
 func TestCopyTreeCopiesManifestPrefixWithEscapedKey(t *testing.T) {
 	resetManifestCache()
 	t.Cleanup(resetManifestCache)
