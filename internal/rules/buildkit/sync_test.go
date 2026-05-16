@@ -121,6 +121,14 @@ func diffSortedStrings(want, got []string) ([]string, []string) {
 func mustBuildkitModuleDir(t *testing.T) string {
 	t.Helper()
 
+	if configured := os.Getenv("TALLY_BUILDKIT_RULESET_GO"); configured != "" {
+		rulesetPath := resolveConfiguredTestPath(configured)
+		if _, err := os.Stat(rulesetPath); err != nil {
+			t.Fatalf("resolve Bazel BuildKit ruleset source: %v", err)
+		}
+		return filepath.Clean(filepath.Join(filepath.Dir(rulesetPath), "..", "..", ".."))
+	}
+
 	goBinary := "go"
 	if configured := os.Getenv("TALLY_GO_BINARY"); configured != "" {
 		goBinary = resolveConfiguredTestPath(configured)
