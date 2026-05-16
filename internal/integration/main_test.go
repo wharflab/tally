@@ -22,6 +22,7 @@ var (
 	coverageDir  string
 	mockRegistry *testutil.MockRegistry
 	acpAgentPath string
+	testTmpDir   string
 )
 
 var errNoRulesSelected = errors.New("selectRules requires at least one rule")
@@ -41,6 +42,7 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("create temporary directory: %w", err)
 	}
+	testTmpDir = tmpDir
 	originalWD, err := os.Getwd()
 	if err != nil {
 		return 0, fmt.Errorf("get working directory: %w", err)

@@ -30,10 +30,14 @@ func ensureBinary(b *testing.B) {
 		return
 	}
 
-	// Build the binary (this happens when running benchmarks without tests)
-	tmpDir, err := os.MkdirTemp("", "tally-bench")
-	if err != nil {
-		b.Fatalf("failed to create benchmark binary directory: %v", err)
+	// Build the binary in a package-lifetime directory. Using b.TempDir here
+	// would remove the binary after the first benchmark that initialized it.
+	tmpDir := b.TempDir()
+	if testTmpDir != "" {
+		tmpDir = filepath.Join(testTmpDir, "bench")
+		if err := os.MkdirAll(tmpDir, 0o750); err != nil {
+			b.Fatalf("failed to create benchmark binary directory: %v", err)
+		}
 	}
 
 	binaryName := "tally"
