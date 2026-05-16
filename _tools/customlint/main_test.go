@@ -76,11 +76,7 @@ func resolveFromManifest(manifestPath, key string) (string, bool) {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := scanner.Text()
-		manifestKey, manifestValue, ok := strings.Cut(line, " ")
-		if !ok {
-			manifestValue = manifestKey
-		}
+		manifestKey, manifestValue, _ := parseManifestLine(scanner.Text())
 		if manifestKey == key {
 			return manifestValue, true
 		}
@@ -88,7 +84,92 @@ func resolveFromManifest(manifestPath, key string) (string, bool) {
 	return "", false
 }
 
+func parseManifestLine(line string) (string, string, bool) {
+	if after, ok := strings.CutPrefix(line, " "); ok {
+		key, value, ok := strings.Cut(after, " ")
+		if !ok {
+			key = unescapeManifestPath(key)
+			return key, key, false
+		}
+		return unescapeManifestPath(key), unescapeManifestPath(value), true
+	}
+	key, value, ok := strings.Cut(line, " ")
+	if !ok {
+		return key, key, false
+	}
+	return key, value, true
+}
+
+func unescapeManifestPath(path string) string {
+	var b strings.Builder
+	b.Grow(len(path))
+	escaped := false
+	for _, r := range path {
+		if escaped {
+			switch r {
+			case 's':
+				b.WriteRune(' ')
+			case 'n':
+				b.WriteRune('\n')
+			case 'b':
+				b.WriteRune('\\')
+			default:
+				b.WriteRune('\\')
+				b.WriteRune(r)
+			}
+			escaped = false
+			continue
+		}
+		if r == '\\' {
+			escaped = true
+			continue
+		}
+		b.WriteRune(r)
+	}
+	if escaped {
+		b.WriteRune('\\')
+	}
+	return b.String()
+}
+
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func TestResolveFromManifestParsesEscapedEntries(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	manifestPath := filepath.Join(tmpDir, "MANIFEST")
+	binaryPath := filepath.Join(tmpDir, "go binary")
+	manifestLine := " tally_go_sdk/bin/go " + escapeManifestPath(binaryPath) + "\n"
+	if err := os.WriteFile(manifestPath, []byte(manifestLine), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := resolveFromManifest(manifestPath, "tally_go_sdk/bin/go")
+	if !ok {
+		t.Fatal("expected manifest entry")
+	}
+	if got != binaryPath {
+		t.Fatalf("manifest value mismatch: %q", got)
+	}
+}
+
+func escapeManifestPath(path string) string {
+	var b []rune
+	for _, r := range path {
+		switch r {
+		case ' ':
+			b = append(b, '\\', 's')
+		case '\n':
+			b = append(b, '\\', 'n')
+		case '\\':
+			b = append(b, '\\', 'b')
+		default:
+			b = append(b, r)
+		}
+	}
+	return string(b)
 }
