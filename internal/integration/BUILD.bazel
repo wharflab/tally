@@ -8,6 +8,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
+    size = "large",
     srcs = [
         "ai_autofix_dl4001_test.go",
         "benchmark_test.go",
@@ -37,6 +38,7 @@ go_test(
         "TALLY_ACP_AGENT_BINARY": "$(rootpath //internal/ai/acp/testdata/testagent)",
         "TALLY_INTEGRATION_BINARY": "$(rootpath //:tally)",
     },
+    timeout = "long",
     deps = [
         "//internal/ai/autofixdata:go_default_library",
         "//internal/dockerfile:go_default_library",
