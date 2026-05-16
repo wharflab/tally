@@ -25,6 +25,7 @@ go_test(
         "cmdliteral_test.go",
         "docurl_test.go",
         "lspliteral_test.go",
+        "main_test.go",
         "rulestruct_test.go",
     ],
     embed = [":go_default_library"],

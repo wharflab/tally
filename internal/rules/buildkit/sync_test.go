@@ -121,16 +121,83 @@ func diffSortedStrings(want, got []string) ([]string, []string) {
 func mustBuildkitModuleDir(t *testing.T) string {
 	t.Helper()
 
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "github.com/moby/buildkit")
-	out, err := cmd.Output()
+	goBinary := "go"
+	if configured := os.Getenv("TALLY_GO_BINARY"); configured != "" {
+		goBinary = resolveConfiguredTestPath(configured)
+	}
+	cmd := exec.Command(goBinary, "list", "-m", "-f", "{{.Dir}}", "github.com/moby/buildkit")
+	cmd.Env = withoutEnv(os.Environ(), "GOEXPERIMENT")
+	if dir := nearestGoModuleDir(); dir != "" {
+		cmd.Dir = dir
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("go list buildkit module dir: %v", err)
+		t.Fatalf("go list buildkit module dir: %v\n%s", err, out)
 	}
 	dir := strings.TrimSpace(string(out))
 	if dir == "" {
 		t.Fatal("empty buildkit module dir from go list")
 	}
 	return dir
+}
+
+func nearestGoModuleDir() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
+			return wd
+		}
+		parent := filepath.Dir(wd)
+		if parent == wd {
+			return ""
+		}
+		wd = parent
+	}
+}
+
+func resolveConfiguredTestPath(path string) string {
+	candidates := []string{path}
+	if !filepath.IsAbs(path) {
+		if absPath, err := filepath.Abs(path); err == nil {
+			candidates = append(candidates, absPath)
+		}
+		runfilesDir := os.Getenv("RUNFILES_DIR")
+		if runfilesDir == "" {
+			runfilesDir = os.Getenv("TEST_SRCDIR")
+		}
+		workspace := os.Getenv("TEST_WORKSPACE")
+		if runfilesDir != "" {
+			candidates = append(candidates, filepath.Join(runfilesDir, path))
+			if workspace != "" {
+				candidates = append(candidates, filepath.Join(runfilesDir, workspace, path))
+			}
+		}
+	}
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return path
+}
+
+func withoutEnv(env []string, keys ...string) []string {
+	blocked := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		blocked[key] = struct{}{}
+	}
+	out := env[:0]
+	for _, item := range env {
+		key, _, _ := strings.Cut(item, "=")
+		if _, ok := blocked[key]; ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func mustUpstreamRuleDefinitions(t *testing.T) []upstreamRuleDef {

@@ -39,6 +39,7 @@ go_test(
         "from_env_test.go",
         "semantic_test.go",
     ],
+    data = ["//internal/integration:fixtures"],
     embed = [":go_default_library"],
     deps = [
         "//internal/dockerfile:go_default_library",

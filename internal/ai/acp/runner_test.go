@@ -25,6 +25,18 @@ func TestMain(m *testing.M) {
 }
 
 func buildTestAgent() (string, error) {
+	if configured := os.Getenv("TALLY_ACP_AGENT_BINARY"); configured != "" {
+		path := resolveConfiguredTestPath(configured)
+		info, err := os.Stat(path)
+		if err != nil {
+			return "", fmt.Errorf("stat configured test agent: %w", err)
+		}
+		if info.IsDir() {
+			return "", fmt.Errorf("configured test agent is a directory: %s", path)
+		}
+		return path, nil
+	}
+
 	tmp, err := os.MkdirTemp("", "tally-acp-testagent-*")
 	if err != nil {
 		return "", fmt.Errorf("mkdtemp: %w", err)
@@ -42,6 +54,32 @@ func buildTestAgent() (string, error) {
 		return "", fmt.Errorf("build test agent: %w", err)
 	}
 	return out, nil
+}
+
+func resolveConfiguredTestPath(path string) string {
+	candidates := []string{path}
+	if !filepath.IsAbs(path) {
+		if absPath, err := filepath.Abs(path); err == nil {
+			candidates = append(candidates, absPath)
+		}
+		runfilesDir := os.Getenv("RUNFILES_DIR")
+		if runfilesDir == "" {
+			runfilesDir = os.Getenv("TEST_SRCDIR")
+		}
+		workspace := os.Getenv("TEST_WORKSPACE")
+		if runfilesDir != "" {
+			candidates = append(candidates, filepath.Join(runfilesDir, path))
+			if workspace != "" {
+				candidates = append(candidates, filepath.Join(runfilesDir, workspace, path))
+			}
+		}
+	}
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return path
 }
 
 func TestRunner_HappyPath(t *testing.T) {

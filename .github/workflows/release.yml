@@ -177,8 +177,8 @@ jobs:
           CLEAN_VERSION="${RELEASE_VERSION#v}"
           DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
           mkdir -p "${DIST_DIR}"
-          TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --//:release_version="${CLEAN_VERSION}" //:tally
-          BINARY="$(tools/bazel/target_output.sh --config=release --//:release_version="${CLEAN_VERSION}" //:tally)"
+          TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally
+          BINARY="$(tools/bazel/target_output.sh --config=release --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally)"
           cp "${BINARY}" "${DIST_DIR}/${{ matrix.binary_name }}"
           chmod 755 "${DIST_DIR}/${{ matrix.binary_name }}"
       - name: Build Windows binary with Bazel
@@ -190,8 +190,8 @@ jobs:
           DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
           mkdir -p "${DIST_DIR}"
           BAZEL_PLATFORM_CONFIG="windows-${{ matrix.goarch }}"
-          TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --config="${BAZEL_PLATFORM_CONFIG}" --//:release_version="${CLEAN_VERSION}" //:tally
-          BINARY="$(tools/bazel/target_output.sh --config=release --config="${BAZEL_PLATFORM_CONFIG}" --//:release_version="${CLEAN_VERSION}" //:tally)"
+          TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --config="${BAZEL_PLATFORM_CONFIG}" --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally
+          BINARY="$(tools/bazel/target_output.sh --config=release --config="${BAZEL_PLATFORM_CONFIG}" --embed_label="${CLEAN_VERSION}" --//:release_version="${CLEAN_VERSION}" //:tally)"
           cp "${BINARY}" "${DIST_DIR}/${{ matrix.binary_name }}"
       - name: Smoke test Linux binary on host
         if: matrix.runner_os == 'Linux'
@@ -405,6 +405,7 @@ jobs:
             [ -n "$ref" ] || continue
             tag="${ref##*:}"
             TALLY_VERSION="${CLEAN_VERSION}" bazel run --config=release \
+              --embed_label="${CLEAN_VERSION}" \
               --//:release_version="${CLEAN_VERSION}" \
               --//:container_registry=ghcr.io \
               --//:container_repository="${REPOSITORY}" \

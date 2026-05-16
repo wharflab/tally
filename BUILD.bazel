@@ -48,6 +48,15 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "go_module_files",
+    srcs = [
+        "go.mod",
+        "go.sum",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
@@ -63,6 +72,6 @@ go_binary(
     visibility = ["//visibility:public"],
     x_defs = {
         "github.com/wharflab/tally/internal/version.commit": "{STABLE_TALLY_COMMIT}",
-        "github.com/wharflab/tally/internal/version.version": "{STABLE_TALLY_VERSION}",
+        "github.com/wharflab/tally/internal/version.version": "{BUILD_EMBED_LABEL}",
     },
 )

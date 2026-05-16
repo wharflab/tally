@@ -27,7 +27,9 @@ go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.from_file(
     experiments = ["jsonv2"],
     go_mod = "//:go.mod",
+    name = "tally_go_sdk",
 )
+use_repo(go_sdk, "tally_go_sdk")
 
 zig_toolchains = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains")
 use_repo(zig_toolchains, "zig_sdk")

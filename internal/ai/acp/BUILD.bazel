@@ -25,6 +25,10 @@ go_test(
         "runner_lifecycle_unix_test.go",
         "runner_test.go",
     ],
+    data = ["//internal/ai/acp/testdata/testagent"],
     embed = [":go_default_library"],
+    env = {
+        "TALLY_ACP_AGENT_BINARY": "$(rootpath //internal/ai/acp/testdata/testagent)",
+    },
     deps = ["@com_github_coder_acp_go_sdk//:go_default_library"],
 )

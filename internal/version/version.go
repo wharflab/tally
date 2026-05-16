@@ -4,6 +4,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"slices"
+	"strings"
 )
 
 var version = "dev"
@@ -19,6 +20,9 @@ func Version() string {
 
 // RawVersion returns the semantic version string without any suffix.
 func RawVersion() string {
+	if version == "" || strings.HasPrefix(version, "{") {
+		return "dev"
+	}
 	return version
 }
 

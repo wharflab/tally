@@ -64,7 +64,14 @@ go_test(
         "undefined_var_test.go",
         "workdir_relative_path_test.go",
     ],
+    data = [
+        "//:go_module_files",
+        "@tally_go_sdk//:bin/go",
+    ],
     embed = [":go_default_library"],
+    env = {
+        "TALLY_GO_BINARY": "$(rootpath @tally_go_sdk//:bin/go)",
+    },
     deps = [
         "//internal/async:go_default_library",
         "//internal/dockerfile:go_default_library",

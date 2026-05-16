@@ -24,6 +24,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["highlight_test.go"],
+    data = ["//_tools/shellcheck-wasm:Dockerfile"],
     embed = [":go_default_library"],
     deps = ["//internal/highlight/core:go_default_library"],
 )

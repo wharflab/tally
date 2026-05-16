@@ -1,0 +1,4 @@
+exports_files(
+    ["Dockerfile"],
+    visibility = ["//visibility:public"],
+)

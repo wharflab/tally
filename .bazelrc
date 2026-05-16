@@ -8,7 +8,6 @@ build --repo_env=GOEXPERIMENT=jsonv2
 build:linux --sandbox_add_mount_pair=/tmp
 build:macos --sandbox_add_mount_pair=/var/tmp
 build:windows --sandbox_add_mount_pair=C:\Temp
-test --test_env=GOEXPERIMENT=jsonv2
 
 # Keep CI and local runs deterministic enough for build debugging.
 build --announce_rc
@@ -18,6 +17,7 @@ test --test_output=errors
 # Shipped binary shape. This matches the previous Makefile/release build tags.
 build:release --stamp
 build:release --workspace_status_command=tools/bazel/workspace_status.sh
+build:release --embed_label=0.0.0-dev
 build:release --compilation_mode=opt
 build:release --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
 
