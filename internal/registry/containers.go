@@ -35,8 +35,9 @@ func init() {
 // image configs from OCI/Docker registries. It respects registries.conf and
 // auth.json via types.SystemContext.
 type ContainersResolver struct {
-	sysCtx    *types.SystemContext
-	blobCache types.BlobInfoCache
+	sysCtx        *types.SystemContext
+	blobCache     types.BlobInfoCache
+	hostOverrides map[string]string
 }
 
 // NewContainersResolver creates a resolver using the default system context.
@@ -53,7 +54,11 @@ func NewContainersResolver() *ContainersResolver {
 		// differently on CI runners than on developer machines.
 		sysCtx.SystemRegistriesConfDirPath = isolatedRegistriesConfDirPath()
 	}
-	return &ContainersResolver{sysCtx: sysCtx, blobCache: memory.New()}
+	hostOverrides := testRegistryHostOverridesFromEnv()
+	if len(hostOverrides) > 0 {
+		sysCtx.DockerInsecureSkipTLSVerify = types.OptionalBoolTrue
+	}
+	return &ContainersResolver{sysCtx: sysCtx, blobCache: memory.New(), hostOverrides: hostOverrides}
 }
 
 func isolatedRegistriesConfDirPath() string {
@@ -77,6 +82,12 @@ func (r *ContainersResolver) ResolveConfig(ctx context.Context, ref, platform st
 	}
 	// Ensure we have a tag or digest.
 	named = reference.TagNameOnly(named)
+	if len(r.hostOverrides) > 0 {
+		named, err = remapTestRegistryHost(named, r.hostOverrides)
+		if err != nil {
+			return ImageConfig{}, &NotFoundError{Ref: ref, Err: fmt.Errorf("apply test registry override: %w", err)}
+		}
+	}
 
 	// Create a docker reference.
 	dockerRef, err := docker.NewReference(named)
@@ -253,6 +264,40 @@ func formatPlatform(p *imgspecv1.Platform) string {
 		return ""
 	}
 	return formatPlatformParts(p.OS, p.Architecture, p.Variant)
+}
+
+func remapTestRegistryHost(named reference.Named, overrides map[string]string) (reference.Named, error) {
+	host, ok := overrides[reference.Domain(named)]
+	if !ok {
+		return named, nil
+	}
+
+	ref := host + "/" + reference.Path(named)
+	if tagged, ok := named.(reference.Tagged); ok {
+		ref += ":" + tagged.Tag()
+	}
+	if digested, ok := named.(reference.Digested); ok {
+		ref += "@" + digested.Digest().String()
+	}
+	return reference.ParseNormalizedNamed(ref)
+}
+
+func testRegistryHostOverridesFromEnv() map[string]string {
+	raw := os.Getenv("TALLY_TEST_REGISTRY_HOST_OVERRIDES")
+	if raw == "" {
+		return nil
+	}
+	overrides := make(map[string]string)
+	for entry := range strings.SplitSeq(raw, ",") {
+		key, value, ok := strings.Cut(entry, "=")
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if !ok || key == "" || value == "" {
+			continue
+		}
+		overrides[key] = value
+	}
+	return overrides
 }
 
 func formatPlatformParts(osName, arch, variant string) string {

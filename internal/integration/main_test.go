@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -24,6 +25,14 @@ var (
 	acpAgentPath string
 	testTmpDir   string
 )
+
+var mockRegistryDomains = []string{
+	"docker.io",
+	"mcr.microsoft.com",
+	"quay.io",
+	"public.ecr.aws",
+	"dhi.io",
+}
 
 var errNoRulesSelected = errors.New("selectRules requires at least one rule")
 
@@ -463,13 +472,7 @@ func prepareMockRegistry(tmpDir string) (string, error) {
 	// fixtures using mcr.microsoft.com / quay.io / public.ecr.aws / dhi.io
 	// would silently leak to live registries — slowing tests down,
 	// flaking on network blips, and breaking offline runs.
-	confPath, err := mockRegistry.WriteRegistriesConf(tmpDir,
-		"docker.io",
-		"mcr.microsoft.com",
-		"quay.io",
-		"public.ecr.aws",
-		"dhi.io",
-	)
+	confPath, err := mockRegistry.WriteRegistriesConf(tmpDir, mockRegistryDomains...)
 	if err != nil {
 		mockRegistry.Close()
 		return "", fmt.Errorf("create registries.conf: %w", err)
@@ -490,6 +493,10 @@ func finalizeMockRegistry(confPath string) error {
 		mockRegistry.Close()
 		return fmt.Errorf("set REGISTRIES_CONFIG_PATH: %w", err)
 	}
+	if err := os.Setenv("TALLY_TEST_REGISTRY_HOST_OVERRIDES", mockRegistryHostOverrides()); err != nil {
+		mockRegistry.Close()
+		return fmt.Errorf("set TALLY_TEST_REGISTRY_HOST_OVERRIDES: %w", err)
+	}
 	// Set default platform to match the mock registry's image platform (linux/arm64).
 	if err := os.Setenv("DOCKER_DEFAULT_PLATFORM", "linux/arm64"); err != nil {
 		mockRegistry.Close()
@@ -499,6 +506,14 @@ func finalizeMockRegistry(confPath string) error {
 	// Clear setup requests (image pushes) so only test-time requests are tracked.
 	mockRegistry.ResetRequests()
 	return nil
+}
+
+func mockRegistryHostOverrides() string {
+	entries := make([]string, 0, len(mockRegistryDomains))
+	for _, domain := range mockRegistryDomains {
+		entries = append(entries, domain+"="+mockRegistry.Host())
+	}
+	return strings.Join(entries, ",")
 }
 
 // selectRules returns args to disable all rules except the specified ones.
