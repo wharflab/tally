@@ -73,9 +73,9 @@ func BenchmarkDiscovery(b *testing.B) {
 	}
 }
 
-// BenchmarkComplexAria measures performance on a complex, real-world Dockerfile.
+// BenchmarkTallyComplexAria measures performance on a complex, real-world Dockerfile.
 // This Dockerfile features multi-stage builds, heredocs, and many RUN commands.
-func BenchmarkComplexAria(b *testing.B) {
+func BenchmarkTallyComplexAria(b *testing.B) {
 	ensureBinary(b)
 
 	dockerfile := filepath.Join("fixtures", "fix", "real-world-aria", "Dockerfile")
@@ -97,9 +97,9 @@ func BenchmarkComplexAria(b *testing.B) {
 	}
 }
 
-// BenchmarkComplexNolus measures performance on a complex multi-stage Containerfile.
+// BenchmarkTallyComplexNolus measures performance on a complex multi-stage Containerfile.
 // This file has many stages, ARG/ENV declarations, and advanced BuildKit features.
-func BenchmarkComplexNolus(b *testing.B) {
+func BenchmarkTallyComplexNolus(b *testing.B) {
 	ensureBinary(b)
 
 	containerfile := filepath.Join("fixtures", "fix", "real-world-nolus", "Containerfile")
@@ -121,10 +121,10 @@ func BenchmarkComplexNolus(b *testing.B) {
 	}
 }
 
-// BenchmarkRealWorldFix measures performance on a real-world Dockerfile with many
+// BenchmarkTallyRealWorldFix measures performance on a real-world Dockerfile with many
 // linting violations and auto-fix opportunities. This exercises the full linting
 // pipeline including fix generation for DL3003, DL3027, and other hadolint rules.
-func BenchmarkRealWorldFix(b *testing.B) {
+func BenchmarkTallyRealWorldFix(b *testing.B) {
 	ensureBinary(b)
 
 	dockerfile := filepath.Join("fixtures", "fix", "benchmark-real-world-fix", "Dockerfile")
