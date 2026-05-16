@@ -11,11 +11,12 @@ var version = "dev"
 
 // Version returns the current version string with BuildKit suffix.
 func Version() string {
+	base := RawVersion()
 	bkVersion := BuildKitVersion()
 	if bkVersion != "" {
-		return version + " (buildkit " + bkVersion + ")"
+		return base + " (buildkit " + bkVersion + ")"
 	}
-	return version
+	return base
 }
 
 // RawVersion returns the semantic version string without any suffix.
