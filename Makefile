@@ -43,7 +43,8 @@ DEADCODE_VERSION := v0.41.0
 test: check-shellcheck-wasm
 	bazel test --config=go --config=race //cmd/... //internal/... //_tools/...
 
-test-verbose: test
+test-verbose: check-shellcheck-wasm
+	bazel test --config=go --config=race --test_output=all //cmd/... //internal/... //_tools/...
 
 lint: check-shellcheck-wasm bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
 	bin/custom-gcl run

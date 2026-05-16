@@ -28,7 +28,7 @@ go_test(
     data = ["//internal/ai/acp/testdata/testagent"],
     embed = [":go_default_library"],
     env = {
-        "TALLY_ACP_AGENT_BINARY": "$(rootpath //internal/ai/acp/testdata/testagent)",
+        "TALLY_ACP_AGENT_BINARY": "$(rlocationpath //internal/ai/acp/testdata/testagent)",
     },
     deps = [
         "//internal/testpath:go_default_library",

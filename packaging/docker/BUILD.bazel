@@ -85,3 +85,12 @@ image_push(
     repository = "{{.REPOSITORY}}",
     tag = "{{.TAG}}",
 )
+
+image_push(
+    name = "push_linux",
+    build_settings = PUSH_BUILD_SETTINGS,
+    image = ":linux_image",
+    registry = "{{.REGISTRY}}",
+    repository = "{{.REPOSITORY}}",
+    tag = "{{.TAG}}",
+)

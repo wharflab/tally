@@ -86,6 +86,10 @@ prepare_idea_community() {
 }
 
 main() {
+  command -v bazel >/dev/null 2>&1 || {
+    echo "required command not found: bazel" >&2
+    exit 1
+  }
   command -v jar >/dev/null 2>&1 || {
     echo "required command not found: jar" >&2
     exit 1

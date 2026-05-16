@@ -31,7 +31,7 @@ jobs:
       - name: Build full-CGO binary
         run: |
           TALLY_VERSION="0.0.0-size-check" bazel build --config=release //:tally
-          cp bazel-bin/tally_/tally tally-bin
+          cp "$(tools/bazel/target_output.sh --config=release //:tally)" tally-bin
           SIZE=$(stat --format='%s' tally-bin)
           echo "SIZE=$SIZE" >> "$GITHUB_ENV"
           echo "Full-CGO Linux binary size: $SIZE bytes ($(numfmt --to=iec-i --suffix=B "$SIZE"))"

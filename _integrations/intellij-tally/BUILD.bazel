@@ -1,4 +1,6 @@
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_filegroup", "pkg_files", "strip_prefix")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_zip")
 load("//tools/bazel:expand_template.bzl", "expand_template")
 
 package(default_visibility = ["//visibility:public"])
@@ -85,31 +87,32 @@ jar --create --file "$@" -C "$$tmp/classes" . -C "$$tmp/resources" .
 """,
 )
 
-genrule(
-    name = "plugin_zip",
+pkg_files(
+    name = "plugin_jar_files",
+    srcs = [":plugin_jar"],
+    attributes = pkg_attributes(mode = "0644"),
+    prefix = PLUGIN_NAME + "/lib",
+)
+
+pkg_files(
+    name = "bundled_bin_files",
+    srcs = BUNDLED_BINS,
+    attributes = pkg_attributes(mode = "0755"),
+    prefix = PLUGIN_NAME + "/bin",
+    strip_prefix = strip_prefix.from_pkg("bundled/bin"),
+)
+
+pkg_filegroup(
+    name = "plugin_zip_files",
     srcs = [
-        ":bundled_bins",
-        ":plugin_jar",
+        ":bundled_bin_files",
+        ":plugin_jar_files",
     ],
-    outs = ["tally-intellij-plugin.zip"],
-    cmd = """
-set -euo pipefail
-tmp="$(@D)/plugin_zip"
-rm -rf "$$tmp"
-mkdir -p "$$tmp/%s/lib"
-cp "$(location :plugin_jar)" "$$tmp/%s/lib/tally-intellij-plugin.jar"
-bundled_locations="$(locations :bundled_bins)"
-for src in $$bundled_locations; do
-  if [ "$${src##*/}" = "empty_bundled_marker" ]; then
-    continue
-  fi
-  rel="$${src#*/bundled/bin/}"
-  if [ "$$rel" = "$$src" ]; then
-    rel="$${src#bundled/bin/}"
-  fi
-  mkdir -p "$$(dirname "$$tmp/%s/bin/$$rel")"
-  cp "$$src" "$$tmp/%s/bin/$$rel"
-done
-(cd "$$tmp" && zip -qr "$$(pwd)/../tally-intellij-plugin.zip" "%s")
-""" % (PLUGIN_NAME, PLUGIN_NAME, PLUGIN_NAME, PLUGIN_NAME, PLUGIN_NAME),
+)
+
+pkg_zip(
+    name = "plugin_zip",
+    srcs = [":plugin_zip_files"],
+    out = "tally-intellij-plugin.zip",
+    mode = "0644",
 )

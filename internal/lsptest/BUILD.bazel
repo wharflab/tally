@@ -11,7 +11,7 @@ go_test(
         "//internal/integration:fixtures",
     ],
     env = {
-        "TALLY_LSPTEST_BINARY": "$(rootpath //:tally)",
+        "TALLY_LSPTEST_BINARY": "$(rlocationpath //:tally)",
     },
     deps = [
         "//internal/lsp/protocol:go_default_library",

@@ -68,6 +68,8 @@ func copyResolvedTree(resolved, src, dst string, info fs.FileInfo) error {
 		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
 			return nil
 		}
+		// Symlinks are intentionally dereferenced by copyFile, matching Bazel's
+		// runfiles-tree behavior for these test workspaces.
 		return copyFile(filePath, target, info.Mode().Perm())
 	})
 }
@@ -108,7 +110,13 @@ func copyManifestTree(src, dst string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("runfiles tree %q not found", src)
+	return fmt.Errorf(
+		"runfiles tree %q not found in manifest; tried %v against %d manifest entries (sample keys: %v)",
+		src,
+		candidateKeys(src),
+		len(manifest),
+		sampleManifestKeys(manifest, 5),
+	)
 }
 
 func copyFile(src, dst string, perm fs.FileMode) error {
@@ -176,8 +184,9 @@ func runfilesManifest() (map[string]string, error) {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := scanner.Text()
-			key, value, ok := strings.Cut(line, " ")
+			key, value, ok := parseManifestLine(line)
 			if !ok {
+				manifestCache.data[key] = value
 				continue
 			}
 			manifestCache.data[key] = value
@@ -185,6 +194,70 @@ func runfilesManifest() (map[string]string, error) {
 		manifestCache.err = scanner.Err()
 	})
 	return manifestCache.data, manifestCache.err
+}
+
+func parseManifestLine(line string) (string, string, bool) {
+	if after, ok := strings.CutPrefix(line, " "); ok {
+		key, value, ok := strings.Cut(after, " ")
+		if !ok {
+			key = unescapeManifestPath(key)
+			return key, key, false
+		}
+		return unescapeManifestPath(key), unescapeManifestPath(value), true
+	}
+	key, value, ok := strings.Cut(line, " ")
+	key = unescapeManifestPath(key)
+	if !ok {
+		return key, key, false
+	}
+	return key, unescapeManifestPath(value), true
+}
+
+func unescapeManifestPath(path string) string {
+	var b strings.Builder
+	b.Grow(len(path))
+	escaped := false
+	for _, r := range path {
+		if escaped {
+			switch r {
+			case 's':
+				b.WriteRune(' ')
+			case 'n':
+				b.WriteRune('\n')
+			case 'b':
+				b.WriteRune('\\')
+			default:
+				b.WriteRune('\\')
+				b.WriteRune(r)
+			}
+			escaped = false
+			continue
+		}
+		if r == '\\' {
+			escaped = true
+			continue
+		}
+		b.WriteRune(r)
+	}
+	if escaped {
+		b.WriteRune('\\')
+	}
+	return b.String()
+}
+
+func sampleManifestKeys(manifest map[string]string, limit int) []string {
+	if limit <= 0 || len(manifest) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(manifest))
+	for key := range manifest {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	if len(keys) > limit {
+		keys = keys[:limit]
+	}
+	return keys
 }
 
 func candidateKeys(name string) []string {

@@ -28,6 +28,10 @@ go_test(
         "main_test.go",
         "rulestruct_test.go",
     ],
+    data = glob(["testdata/**"]) + ["@tally_go_sdk//:bin/go"],
     embed = [":go_default_library"],
+    env = {
+        "TALLY_GO_BINARY": "$(rlocationpath @tally_go_sdk//:bin/go)",
+    },
     deps = ["@org_golang_x_tools//go/analysis/analysistest:go_default_library"],
 )

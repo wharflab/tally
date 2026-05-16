@@ -71,7 +71,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     env = {
-        "TALLY_BUILDKIT_RULESET_GO": "$(rootpath @buildkit_source//:dockerfile_ruleset_go)",
+        "TALLY_BUILDKIT_RULESET_GO": "$(rlocationpath @buildkit_source//:dockerfile_ruleset_go)",
     },
     deps = [
         "//internal/async:go_default_library",

@@ -49,6 +49,14 @@ func TestMain(m *testing.M) {
 
 	if configured := os.Getenv("TALLY_LSPTEST_BINARY"); configured != "" {
 		configured = resolveConfiguredTestPath(configured)
+		if !filepath.IsAbs(configured) {
+			absConfigured, err := filepath.Abs(configured)
+			if err != nil {
+				_ = os.RemoveAll(tmpDir)
+				panic("failed to canonicalize Bazel tally binary path: " + err.Error())
+			}
+			configured = absConfigured
+		}
 		if info, err := os.Stat(configured); err != nil {
 			_ = os.RemoveAll(tmpDir)
 			panic("failed to stat Bazel tally binary: " + err.Error())
@@ -242,7 +250,7 @@ func startTestServer(t *testing.T) *testServer {
 	t.Helper()
 
 	cmd := exec.Command(binaryPath, "lsp", "--stdio")
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2", "GOCOVERDIR="+coverageDir)
 
 	stdin, err := cmd.StdinPipe()
 	require.NoError(t, err)

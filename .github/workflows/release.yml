@@ -9,6 +9,7 @@ on:
       - ".bazelrc"
       - ".bazelversion"
       - "BUILD.bazel"
+      - "**/BUILD.bazel"
       - "MODULE.bazel"
       - "MODULE.bazel.lock"
       - ".github/workflows/release.yml"
@@ -16,6 +17,7 @@ on:
       - "_integrations/**"
       - "patches/**"
       - "scripts/release/**"
+      - "tools/bazel/**"
       - "packaging/**"
       - "Makefile"
   workflow_dispatch:
@@ -967,6 +969,8 @@ jobs:
           mkdir -p _integrations/intellij-tally/dist
           cp bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip \
             "_integrations/intellij-tally/dist/tally-intellij-plugin-${CLEAN_VERSION}.zip"
+      - name: Run IntelliJ plugin verifier
+        run: bash _integrations/intellij-tally/build/smoke.sh
       - name: Resolve IntelliJ plugin artifact
         id: intellij_zip
         run: |

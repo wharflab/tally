@@ -69,6 +69,10 @@ jobs:
           cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Build
         run: bazel build --config=release //:tally
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
       - name: Verify PowerShell analyzer runtime
         shell: pwsh
         run: |
@@ -121,6 +125,40 @@ jobs:
           }
       - name: Run Go tests
         run: bazel test --config=go --config=race //cmd/... //internal/... //_tools/...
+      - name: Run unit tests with coverage
+        run: |
+          GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
+          make "$GOTESTSUM_BIN"
+          mkdir -p coverage
+          # Exclude scripts/* from coverage collection (they are tooling, not product code).
+          COVERPKG=$(go list ./... | grep -v '/scripts/' | paste -sd, -)
+          "$GOTESTSUM_BIN" --format testname --junitfile junit.xml -- \
+            -race -coverprofile=coverage.out -covermode=atomic -coverpkg="$COVERPKG" ./...
+      - name: Run integration tests with coverage
+        run: |
+          GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
+          GOCOVERDIR="$(pwd)/coverage" "$GOTESTSUM_BIN" --format testname --junitfile junit-integration.xml -- ./internal/integration/...
+      - name: Run LSP protocol tests with coverage
+        run: |
+          GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
+          GOCOVERDIR="$(pwd)/coverage" "$GOTESTSUM_BIN" --format testname --junitfile junit-lsptest.xml -- ./internal/lsptest/...
+          go tool covdata textfmt -i=coverage -o=coverage-integration.txt
+          bash scripts/merge-go-coverprofiles.sh coverage-merged.out coverage.out coverage-integration.txt
+          bash scripts/filter-go-coverprofile.sh coverage-merged.out coverage.filtered.out
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          use_oidc: true
+          files: coverage.filtered.out
+          fail_ci_if_error: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6
+        with:
+          report_type: test_results
+          use_oidc: true
+          files: junit.xml,junit-integration.xml,junit-lsptest.xml
+          fail_ci_if_error: true
   test-windows:
     name: Test (Windows)
     needs: shellcheck-wasm
@@ -149,7 +187,7 @@ jobs:
         run: bazel build --config=release --config=windows-amd64 //:tally
       - name: Run tests
         shell: msys2 {0}
-        run: bazel test --config=go --config=windows-amd64 //cmd/... //internal/...
+        run: bazel test --config=go --config=race --config=windows-amd64 //cmd/... //internal/...
   lint:
     runs-on: ubuntu-latest
     steps:

@@ -25,7 +25,7 @@ func ensureBinary(b *testing.B) {
 	if benchBinaryPath != "" {
 		return
 	}
-	if binaryPath != "" && (os.Getenv("TALLY_INTEGRATION_BINARY") != "" || os.Getenv("TEST_SRCDIR") != "") {
+	if binaryPath != "" {
 		benchBinaryPath = binaryPath
 		return
 	}

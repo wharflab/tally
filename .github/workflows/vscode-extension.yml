@@ -29,7 +29,13 @@ jobs:
           repository-cache: true
           cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Build smoke artifacts
-        run: bazel build --config=release //:tally //_integrations/vscode-tally:extension_bundle
+        run: |
+          bazel build --config=release //_integrations/vscode-tally:extension_bundle
+          bazel build \
+            --collect_code_coverage \
+            --instrumentation_filter=//... \
+            --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub \
+            //:tally
       - name: Typescript check
         run: bazel run //_integrations/vscode-tally:typecheck
       - name: Lint
@@ -42,7 +48,11 @@ jobs:
         run: |
           set -euo pipefail
           BUNDLE="$(tools/bazel/target_output.sh //_integrations/vscode-tally:extension_bundle)"
-          BINARY="$(tools/bazel/target_output.sh --config=release //:tally)"
+          BINARY="$(tools/bazel/target_output.sh \
+            --collect_code_coverage \
+            --instrumentation_filter=//... \
+            --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub \
+            //:tally)"
           echo "TALLY_VSCODE_BUNDLE=$PWD/$BUNDLE" >> "$GITHUB_ENV"
           echo "TALLY_VSCODE_BINARY=$PWD/$BINARY" >> "$GITHUB_ENV"
       - name: Set up Bun

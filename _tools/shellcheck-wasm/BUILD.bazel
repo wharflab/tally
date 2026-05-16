@@ -79,7 +79,7 @@ image_manifest(
 image_load(
     name = "load_shellcheck_wasm_image",
     image = ":shellcheck_wasm_image",
-    tags = ["manual"],
     tag = "tally-shellcheck-wasm:latest",
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )

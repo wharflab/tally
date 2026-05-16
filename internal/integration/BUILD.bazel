@@ -36,8 +36,8 @@ go_test(
         "//internal/ai/acp/testdata/testagent",
     ],
     env = {
-        "TALLY_ACP_AGENT_BINARY": "$(rootpath //internal/ai/acp/testdata/testagent)",
-        "TALLY_INTEGRATION_BINARY": "$(rootpath //:tally)",
+        "TALLY_ACP_AGENT_BINARY": "$(rlocationpath //internal/ai/acp/testdata/testagent)",
+        "TALLY_INTEGRATION_BINARY": "$(rlocationpath //:tally)",
     },
     deps = [
         "//internal/ai/autofixdata:go_default_library",

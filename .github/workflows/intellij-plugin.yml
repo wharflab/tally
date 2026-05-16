@@ -53,8 +53,8 @@ jobs:
           mkdir -p _integrations/intellij-tally/dist
           cp bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip \
             _integrations/intellij-tally/dist/tally-intellij-plugin-0.1.0-dev.zip
-      - name: IntelliJ Community smoke check
-        run: make intellij-plugin-smoke
+      - name: Run IntelliJ plugin verifier
+        run: make intellij-plugin-verify
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v7
         with:

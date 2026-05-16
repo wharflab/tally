@@ -10,6 +10,7 @@ filegroup(
         ".vscodeignore",
         "assets/**",
         "bunfig.toml",
+        "bundled/**",
         "package.json",
         "README.md",
         "src/**",
@@ -73,5 +74,5 @@ bun_binary(
     ],
     entry_point = "tools/package-vsix.js",
     node_modules = "@vscode_tally_bun_deps//:node_modules",
-    working_dir = "entry_point",
+    working_dir = "workspace",
 )

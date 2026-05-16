@@ -8,6 +8,9 @@ commit="${GITHUB_SHA:-}"
 if [[ -z "${commit}" ]]; then
   commit="$(git rev-parse HEAD 2>/dev/null || true)"
 fi
+if [[ -z "${commit}" ]]; then
+  commit="unknown"
+fi
 
 echo "STABLE_TALLY_VERSION ${version}"
 echo "STABLE_TALLY_COMMIT ${commit}"

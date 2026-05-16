@@ -6,10 +6,22 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 
-bazel cquery \
-  --noshow_progress \
-  --ui_event_filters=-info \
-  --output=files \
-  "$@" |
-  sed '/^[[:space:]]*$/d' |
-  tail -n 1
+outputs=()
+while IFS= read -r output; do
+  outputs+=("$output")
+done < <(
+  bazel cquery \
+    --noshow_progress \
+    --ui_event_filters=-info \
+    --output=files \
+    "$@" |
+    sed '/^[[:space:]]*$/d'
+)
+
+if [ "${#outputs[@]}" -ne 1 ]; then
+  printf 'expected exactly one output for target query, got %d\n' "${#outputs[@]}" >&2
+  printf '%s\n' "${outputs[@]}" >&2
+  exit 1
+fi
+
+printf '%s\n' "${outputs[0]}"

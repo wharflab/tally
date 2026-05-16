@@ -50,8 +50,8 @@ async function writeUserSettings(userDataDir: string, settings: unknown): Promis
 
 async function fileExists(file: string): Promise<boolean> {
   try {
-    await fs.access(file);
-    return true;
+    const st = await fs.stat(file);
+    return st.isFile();
   } catch {
     return false;
   }

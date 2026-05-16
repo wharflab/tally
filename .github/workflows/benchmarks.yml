@@ -20,6 +20,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - uses: ./.github/actions/shellcheck-wasm
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
       - uses: bazel-contrib/setup-bazel@0.19.0
         with:
           bazelisk-cache: true
@@ -31,12 +36,15 @@ jobs:
         id: benchmark-binaries
         run: |
           bazel build --config=release //:tally //internal/ai/acp/testdata/testagent
+          echo "tally_binary=$(pwd)/$(tools/bazel/target_output.sh --config=release //:tally)" >> "$GITHUB_OUTPUT"
           echo "acp_agent=$(pwd)/$(tools/bazel/target_output.sh --config=release //internal/ai/acp/testdata/testagent)" >> "$GITHUB_OUTPUT"
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
         with:
           # Go only supports walltime mode currently
           mode: walltime
-          run: go test -bench=. ./internal/integration
+          # Use longer benchtime and multiple runs to reduce noise on shared runners.
+          run: go test -bench=. -benchtime=5s -count=5 ./internal/integration/...
         env:
+          TALLY_INTEGRATION_BINARY: ${{ steps.benchmark-binaries.outputs.tally_binary }}
           TALLY_ACP_AGENT_BINARY: ${{ steps.benchmark-binaries.outputs.acp_agent }}

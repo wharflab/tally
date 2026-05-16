@@ -48,12 +48,12 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 		return 0, fmt.Errorf("get working directory: %w", err)
 	}
 	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+	defer func() {
 		if err := os.Chdir(originalWD); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "restore working directory: %v\n", err)
 		}
-	}()
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
 	}()
 
 	// The two `go build` invocations and the in-process mock registry setup
@@ -171,6 +171,13 @@ func configuredTestBinary(envName string) (string, bool, error) {
 		return "", false, nil
 	}
 	path = resolveConfiguredTestPath(path)
+	if !filepath.IsAbs(path) {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return "", true, fmt.Errorf("get absolute %s path %q: %w", envName, path, err)
+		}
+		path = absPath
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return "", true, fmt.Errorf("stat %s path %q: %w", envName, path, err)

@@ -5,13 +5,13 @@
  _STAGED_BUILD_RUNNER = """import { spawnSync } from "node:child_process";
  import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 -import { tmpdir } from "node:os";
-+import { existsSync, readdirSync, symlinkSync } from "node:fs";
++import { existsSync, readdirSync, statSync, symlinkSync } from "node:fs";
  import { dirname, resolve } from "node:path";
 +import { tmpdir } from "node:os";
 
  const [, , manifestPath, ...buildArgs] = process.argv;
  const execroot = process.cwd();
-@@ -16,6 +17,82 @@
+@@ -16,6 +17,87 @@
    return `${flag}=${resolve(execroot, value)}`;
  }
 
@@ -26,7 +26,12 @@
 +      continue;
 +    }
 +
-+    let dir = dirname(candidate);
++    let dir;
++    try {
++      dir = statSync(candidate).isDirectory() ? candidate : dirname(candidate);
++    } catch (_) {
++      continue;
++    }
 +    for (;;) {
 +      if (existsSync(resolve(dir, "package.json"))) {
 +        return dir;
@@ -94,7 +99,7 @@
  try {
    for (const relpath of readFileSync(manifestPath, "utf8").split(/\\r?\\n/)) {
      if (!relpath) {
-@@ -27,6 +104,8 @@
+@@ -27,6 +109,8 @@
      cpSync(src, dest, { dereference: true, force: true, recursive: true });
    }
 
