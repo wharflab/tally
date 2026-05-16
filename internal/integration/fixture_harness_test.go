@@ -16,6 +16,11 @@ import (
 
 const fixtureRoot = "fixtures"
 
+// Registry-backed fixtures share one in-process mock registry. Keep them
+// serial so race-enabled CI runs do not overload the resolver path and turn
+// deterministic slow-check assertions into registry-unreachable noise.
+var slowCheckFixtureSlots = make(chan struct{}, 1)
+
 func TestLintFixtures(t *testing.T) {
 	t.Parallel()
 
@@ -68,6 +73,8 @@ func fixtureDirs(t *testing.T, root string) []string {
 
 func runLintFixture(t *testing.T, dir string) {
 	t.Helper()
+	releaseSlowCheckSlot := acquireSlowCheckFixtureSlot(t, dir)
+	defer releaseSlowCheckSlot()
 
 	dockerfilePath := fixtureBuildFile(dir)
 	snapshotDir := fixtureSnapshotDir(t, dir)
@@ -131,6 +138,8 @@ func runLintFixture(t *testing.T, dir string) {
 
 func runFixFixture(t *testing.T, dir string) {
 	t.Helper()
+	releaseSlowCheckSlot := acquireSlowCheckFixtureSlot(t, dir)
+	defer releaseSlowCheckSlot()
 
 	buildFile := fixtureBuildFile(dir)
 	snapshotDir := fixtureSnapshotDir(t, dir)
@@ -253,6 +262,9 @@ type fixtureHarnessConfig struct {
 		Format    string `toml:"format"`
 		FailLevel string `toml:"fail-level"`
 	} `toml:"output"`
+	SlowChecks struct {
+		Mode string `toml:"mode"`
+	} `toml:"slow-checks"`
 }
 
 func readFixtureHarnessConfig(t *testing.T, dir string) fixtureHarnessConfig {
@@ -278,6 +290,17 @@ func readFixtureHarnessConfig(t *testing.T, dir string) fixtureHarnessConfig {
 func lintFixtureOutputFormat(t *testing.T, dir string) string {
 	t.Helper()
 	return readFixtureHarnessConfig(t, dir).Output.Format
+}
+
+func acquireSlowCheckFixtureSlot(t *testing.T, dir string) func() {
+	t.Helper()
+	if readFixtureHarnessConfig(t, dir).SlowChecks.Mode != "on" {
+		return func() {}
+	}
+	slowCheckFixtureSlots <- struct{}{}
+	return func() {
+		<-slowCheckFixtureSlots
+	}
 }
 
 func fixFixtureExpectedExitCode(t *testing.T, dir, stderr string) int {
