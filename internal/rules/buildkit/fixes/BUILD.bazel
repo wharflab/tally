@@ -1,0 +1,48 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "consistent_instruction_casing.go",
+        "enricher.go",
+        "expose_proto_casing.go",
+        "from_as_casing.go",
+        "invalid_definition_description.go",
+        "json_args_recommended.go",
+        "legacy_key_value_format.go",
+        "maintainer_deprecated.go",
+        "multiple_instructions_disallowed.go",
+        "no_empty_continuation.go",
+        "position.go",
+        "stage_name_casing.go",
+        "tokenizer.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/rules/buildkit/fixes",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "enricher_test.go",
+        "fixes_test.go",
+        "json_args_recommended_test.go",
+        "tokenizer_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/dockerfile:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+    ],
+)

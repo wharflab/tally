@@ -1,0 +1,30 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "autofixdata.go",
+        "objective.go",
+        "prompt.go",
+        "registry_insights.go",
+        "runtime_validation.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/ai/autofixdata",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/patch:go_default_library",
+        "//internal/rules:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_docker_image_spec//specs-go/v1:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["runtime_validation_test.go"],
+    embed = [":go_default_library"],
+    deps = ["//internal/dockerfile:go_default_library"],
+)

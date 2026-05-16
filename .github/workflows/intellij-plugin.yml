@@ -32,26 +32,27 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/shellcheck-wasm
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - uses: bazel-contrib/setup-bazel@0.19.0
         with:
-          go-version-file: go.mod
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
       - name: Build tally
-        run: make build
-      - name: Cache IntelliJ build toolchains
-        uses: actions/cache@v5
-        with:
-          path: _integrations/intellij-tally/.cache
-          key: intellij-toolchain-${{ runner.os }}-${{ hashFiles('_integrations/intellij-tally/build/versions.toml') }}
-          restore-keys: |
-            intellij-toolchain-${{ runner.os }}-
-      - name: Build and verify IntelliJ plugin
-        run: make intellij-plugin-verify
+        run: bazel build --config=release //:tally
+      - name: Build IntelliJ plugin
+        run: |
+          set -euo pipefail
+          bazel build --//:release_version=0.1.0-dev //_integrations/intellij-tally:plugin_zip
+          mkdir -p _integrations/intellij-tally/dist
+          cp bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip \
+            _integrations/intellij-tally/dist/tally-intellij-plugin-0.1.0-dev.zip
       - name: IntelliJ Community smoke check
         run: make intellij-plugin-smoke
       - name: Upload plugin artifact

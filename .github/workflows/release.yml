@@ -6,8 +6,15 @@ on:
       - "v*"
   pull_request:
     paths:
+      - ".bazelrc"
+      - ".bazelversion"
+      - "BUILD.bazel"
+      - "MODULE.bazel"
+      - "MODULE.bazel.lock"
       - ".github/workflows/release.yml"
       - ".github/macos-entitlements.plist"
+      - "_integrations/**"
+      - "patches/**"
       - "scripts/release/**"
       - "packaging/**"
       - "Makefile"
@@ -138,6 +145,13 @@ jobs:
       - uses: ./.github/actions/download-shellcheck-wasm
         with:
           artifact-name: shellcheck-wasm
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ github.job }}-${{ matrix.id }}
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Set up Go
         uses: actions/setup-go@v6
         if: matrix.runner_os != 'Linux'
@@ -155,50 +169,30 @@ jobs:
           update: true
           location: ${{ runner.temp }}
           path-type: inherit
-          pacboy: toolchain:p
-      - name: Build Linux binary
-        if: matrix.runner_os == 'Linux'
+      - name: Build binary with Bazel
+        if: matrix.runner_os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
           CLEAN_VERSION="${RELEASE_VERSION#v}"
-          GO_VERSION="$(sed -n 's/^go //p' go.mod | head -n 1)"
-          if [ -z "${GO_VERSION}" ]; then
-            echo "::error::Failed to resolve Go version from go.mod"
-            exit 1
-          fi
-          GO_ARCHIVE_URL="https://go.dev/dl/go${GO_VERSION}.linux-${{ matrix.go_archive_arch }}.tar.gz"
           DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
           mkdir -p "${DIST_DIR}"
-          LDFLAGS="-s -w -X github.com/wharflab/tally/internal/version.version=${CLEAN_VERSION} -X github.com/wharflab/tally/internal/version.commit=${GITHUB_SHA}"
-          echo "Using Go toolchain archive: ${GO_ARCHIVE_URL}"
-          docker run --rm \
-            --platform "linux/${{ matrix.goarch }}" \
-            -e GOEXPERIMENT="${GOEXPERIMENT}" \
-            -e GOTOOLCHAIN="${GOTOOLCHAIN}" \
-            -e GOSUMDB="sum.golang.org" \
-            -e GO_ARCHIVE_URL="${GO_ARCHIVE_URL}" \
-            -e GOOS="${{ matrix.goos }}" \
-            -e GOARCH="${{ matrix.goarch }}" \
-            -e BUILD_TAGS="${BUILD_TAGS}" \
-            -e LDFLAGS="${LDFLAGS}" \
-            -e DIST_DIR="${DIST_DIR}" \
-            -v "${{ github.workspace }}:/src" \
-            -w /src \
-            "${{ matrix.container_image }}" \
-            bash -lc '
-              set -euo pipefail
-              yum install -y gcc gcc-c++ git curl tar gzip python3 make ca-certificates binutils
-              curl -fsSL "${GO_ARCHIVE_URL}" | tar -C /usr/local -xz
-              export PATH=/usr/local/go/bin:$PATH
-              CC=gcc \
-              CXX=g++ \
-              CGO_ENABLED=1 \
-              GOOS="${GOOS}" \
-              GOARCH="${GOARCH}" \
-              go build -buildvcs=false -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
-              chmod 755 "${DIST_DIR}/${{ matrix.binary_name }}"
-            '
+          TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --//:release_version="${CLEAN_VERSION}" //:tally
+          BINARY="$(tools/bazel/target_output.sh --config=release --//:release_version="${CLEAN_VERSION}" //:tally)"
+          cp "${BINARY}" "${DIST_DIR}/${{ matrix.binary_name }}"
+          chmod 755 "${DIST_DIR}/${{ matrix.binary_name }}"
+      - name: Build Windows binary with Bazel
+        if: matrix.runner_os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          CLEAN_VERSION="${RELEASE_VERSION#v}"
+          DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
+          mkdir -p "${DIST_DIR}"
+          BAZEL_PLATFORM_CONFIG="windows-${{ matrix.goarch }}"
+          TALLY_VERSION="${CLEAN_VERSION}" bazel build --config=release --config="${BAZEL_PLATFORM_CONFIG}" --//:release_version="${CLEAN_VERSION}" //:tally
+          BINARY="$(tools/bazel/target_output.sh --config=release --config="${BAZEL_PLATFORM_CONFIG}" --//:release_version="${CLEAN_VERSION}" //:tally)"
+          cp "${BINARY}" "${DIST_DIR}/${{ matrix.binary_name }}"
       - name: Smoke test Linux binary on host
         if: matrix.runner_os == 'Linux'
         shell: bash
@@ -248,21 +242,6 @@ jobs:
           assert payload["Vendor"] == "Wharflab", payload
           assert payload["Version"] == expected_version, payload
           PY
-      - name: Build macOS binary
-        if: matrix.runner_os == 'macOS'
-        shell: bash
-        run: |
-          set -euo pipefail
-          CLEAN_VERSION="${RELEASE_VERSION#v}"
-          DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
-          mkdir -p "${DIST_DIR}"
-          LDFLAGS="-s -w -X github.com/wharflab/tally/internal/version.version=${CLEAN_VERSION} -X github.com/wharflab/tally/internal/version.commit=${GITHUB_SHA}"
-          CC="${{ matrix.cc }}" \
-          CXX="${{ matrix.cxx }}" \
-          CGO_ENABLED=1 \
-          GOOS="${{ matrix.goos }}" \
-          GOARCH="${{ matrix.goarch }}" \
-          go build -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
       - name: Smoke test macOS Docker plugin metadata
         if: matrix.runner_os == 'macOS'
         shell: bash
@@ -291,21 +270,6 @@ jobs:
           assert payload["Vendor"] == "Wharflab", payload
           assert payload["Version"] == expected_version, payload
           PY
-      - name: Build Windows binary
-        if: matrix.runner_os == 'Windows'
-        shell: msys2 {0}
-        run: |
-          set -euo pipefail
-          CLEAN_VERSION="${RELEASE_VERSION#v}"
-          DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
-          mkdir -p "${DIST_DIR}"
-          export CC="${{ matrix.cc }}"
-          export CXX="${{ matrix.cxx }}"
-          export CGO_ENABLED=1
-          export GOOS="${{ matrix.goos }}"
-          export GOARCH="${{ matrix.goarch }}"
-          LDFLAGS="-s -w -X github.com/wharflab/tally/internal/version.version=${CLEAN_VERSION} -X github.com/wharflab/tally/internal/version.commit=${GITHUB_SHA}"
-          go build -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
       - name: Smoke test Windows binary
         if: matrix.runner_os == 'Windows'
         shell: pwsh
@@ -347,13 +311,13 @@ jobs:
             throw "metadata version mismatch: expected=$expectedVersion actual=$($metadata.Version)"
           }
       - name: Import macOS Code Signing Certificate
-        if: matrix.goos == 'darwin'
+        if: matrix.goos == 'darwin' && github.event_name != 'pull_request'
         uses: apple-actions/import-codesign-certs@v7
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       - name: Sign and notarize macOS binary
-        if: matrix.goos == 'darwin'
+        if: matrix.goos == 'darwin' && github.event_name != 'pull_request'
         shell: bash
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -424,6 +388,29 @@ jobs:
             type=semver,pattern=v{{version}}
             type=ref,event=pr
             type=raw,value=v${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+      - name: Build and push Linux container image with Bazel
+        if: matrix.runner_os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEAN_VERSION="${RELEASE_VERSION#v}"
+          IMAGE_REPO="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          REPOSITORY="${IMAGE_REPO#ghcr.io/}"
+          if [ "${{ matrix.goarch }}" = "arm64" ]; then
+            TARGET="//packaging/docker:push_linux_arm64"
+          else
+            TARGET="//packaging/docker:push_linux_amd64"
+          fi
+          while IFS= read -r ref; do
+            [ -n "$ref" ] || continue
+            tag="${ref##*:}"
+            TALLY_VERSION="${CLEAN_VERSION}" bazel run --config=release \
+              --//:release_version="${CLEAN_VERSION}" \
+              --//:container_registry=ghcr.io \
+              --//:container_repository="${REPOSITORY}" \
+              --//:container_tag="${tag}" \
+              "${TARGET}"
+          done <<< "${{ steps.meta.outputs.tags }}"
           # https://github.com/profnandaa/buildkit/blob/97b80f23f3e55861f70bb7aaf4558340af78d030/docs/windows.md#cni--networking-setup
       - name: Setup CNI
         if: matrix.id == 'windows-amd64'
@@ -604,14 +591,14 @@ jobs:
 
           Write-Host "Docker Buildx plugin installed successfully"
       - name: Set up Docker Buildx
-        if: matrix.runner_os == 'Linux' || matrix.id == 'windows-amd64'
+        if: matrix.id == 'windows-amd64'
         uses: docker/setup-buildx-action@v4
         with:
           version: ${{ steps.dockerbuildx_windows.outputs.version || 'v0.32.1' }}
           driver: ${{ matrix.id == 'windows-amd64' && 'remote' || 'docker-container' }}
           endpoint: ${{ matrix.id == 'windows-amd64' && 'npipe:////./pipe/buildkitd' || '' }}
       - name: Build and push container image
-        if: matrix.id == 'windows-amd64' || matrix.runner_os == 'Linux'
+        if: matrix.id == 'windows-amd64'
         uses: docker/build-push-action@v7
         id: dockerbuild
         with:
@@ -826,6 +813,13 @@ jobs:
         uses: actions/checkout@v6
         with:
           lfs: false
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ github.job }}-${{ matrix.vscode_target }}
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Download signed artifacts
         uses: actions/download-artifact@v8
         with:
@@ -854,17 +848,11 @@ jobs:
         run: |
           CLEAN_VERSION="${VERSION#v}"
           npm version --no-git-tag-version --ignore-scripts "$CLEAN_VERSION"
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        working-directory: _integrations/vscode-tally
-      - name: Compile extension
-        run: bun run prevsce:package
-        working-directory: _integrations/vscode-tally
       - name: Package platform-specific VSIX
-        run: bunx @vscode/vsce package --no-dependencies --target ${{ matrix.vscode_target }} -o tally-${{ matrix.vscode_target }}.vsix
-        working-directory: _integrations/vscode-tally
+        run: |
+          bazel run //_integrations/vscode-tally:package_vscode_extension -- \
+            "$PWD/_integrations/vscode-tally/tally-${{ matrix.vscode_target }}.vsix" \
+            --target "${{ matrix.vscode_target }}"
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v7
         with:
@@ -896,6 +884,13 @@ jobs:
         uses: actions/checkout@v6
         with:
           lfs: false
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Download signed artifacts
         uses: actions/download-artifact@v8
         with:
@@ -958,9 +953,13 @@ jobs:
               || { echo "::error::Failed to set plugin_version in versions.toml"; exit 1; }
           fi
       - name: Build IntelliJ plugin
-        run: make intellij-plugin
-      - name: IntelliJ Community smoke check
-        run: make intellij-plugin-smoke
+        run: |
+          set -euo pipefail
+          CLEAN_VERSION="${VERSION#v}"
+          bazel build --//:release_version="${CLEAN_VERSION}" //_integrations/intellij-tally:plugin_zip
+          mkdir -p _integrations/intellij-tally/dist
+          cp bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip \
+            "_integrations/intellij-tally/dist/tally-intellij-plugin-${CLEAN_VERSION}.zip"
       - name: Resolve IntelliJ plugin artifact
         id: intellij_zip
         run: |

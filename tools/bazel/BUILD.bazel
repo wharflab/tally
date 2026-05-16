@@ -1,0 +1,4 @@
+exports_files([
+    "expand_template.bzl",
+    "workspace_status.sh",
+])

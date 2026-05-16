@@ -1,0 +1,44 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "async.go",
+        "config.go",
+        "linter.go",
+        "processors.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/linter",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/async:go_default_library",
+        "//internal/config:go_default_library",
+        "//internal/context:go_default_library",
+        "//internal/directive:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/facts:go_default_library",
+        "//internal/invocation:go_default_library",
+        "//internal/processor:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/rules/all:go_default_library",
+        "//internal/rules/buildkit:go_default_library",
+        "//internal/rules/buildkit/fixes:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/sourcemap:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "config_test.go",
+        "linter_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/async:go_default_library",
+        "//internal/config:go_default_library",
+        "//internal/invocation:go_default_library",
+        "//internal/rules:go_default_library",
+    ],
+)

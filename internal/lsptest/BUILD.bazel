@@ -1,0 +1,26 @@
+load("@rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "lsp_test.go",
+        "setup_test.go",
+    ],
+    data = glob(["__snapshots__/**"]) + [
+        "//:tally",
+        "//internal/integration:fixtures",
+    ],
+    env = {
+        "TALLY_LSPTEST_BINARY": "$(rootpath //:tally)",
+    },
+    deps = [
+        "//internal/lsp/protocol:go_default_library",
+        "@com_github_gkampitakis_go_snaps//match:go_default_library",
+        "@com_github_gkampitakis_go_snaps//snaps:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+        "@org_golang_x_exp_jsonrpc2//:go_default_library",
+        "@st_bug_go_lsp//:go_default_library",
+        "@st_bug_go_lsp//textedits:go_default_library",
+    ],
+)

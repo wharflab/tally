@@ -1,0 +1,109 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("//tools/bazel:expand_template.bzl", "expand_template")
+
+package(default_visibility = ["//visibility:public"])
+
+PLUGIN_ID = "io.github.wharflab.tally"
+PLUGIN_NAME = "Tally"
+PLUGIN_SINCE_BUILD = "252.25557"
+
+KOTLIN_SRCS = glob(["src/main/kotlin/**/*.kt"])
+BUNDLED_BINS = glob(["bundled/bin/**"], allow_empty = True)
+
+RESOURCE_SRCS = [
+    "src/main/resources/META-INF/lsp.xml",
+    "src/main/resources/META-INF/pluginIcon.svg",
+    "src/main/resources/icons/tally.svg",
+]
+
+filegroup(
+    name = "kotlin_sources",
+    srcs = KOTLIN_SRCS,
+)
+
+genrule(
+    name = "empty_bundled_marker_file",
+    outs = ["empty_bundled_marker"],
+    cmd = ": > $@",
+)
+
+filegroup(
+    name = "bundled_bins",
+    srcs = BUNDLED_BINS + [":empty_bundled_marker_file"],
+)
+
+expand_template(
+    name = "patched_plugin_xml",
+    out = "generated/META-INF/plugin.xml",
+    static_substitutions = {
+        " until-build=\"@UNTIL_BUILD@\"": "",
+        "@PLUGIN_ID@": PLUGIN_ID,
+        "@SINCE_BUILD@": PLUGIN_SINCE_BUILD,
+    },
+    substitutions = {
+        "@PLUGIN_VERSION@": "//:release_version",
+    },
+    template = "src/main/resources/META-INF/plugin.xml",
+)
+
+kt_jvm_library(
+    name = "plugin_classes",
+    srcs = KOTLIN_SRCS,
+    deps = [
+        "@rules_kotlin//kotlin/compiler:kotlin-stdlib",
+        "@rules_kotlin//kotlin/compiler:kotlin-stdlib-jdk8",
+        "@intellij_webstorm_sdk//:ide_api",
+    ],
+)
+
+genrule(
+    name = "plugin_jar",
+    srcs = [
+        ":patched_plugin_xml",
+        ":plugin_classes.jar",
+    ] + RESOURCE_SRCS,
+    outs = ["tally-intellij-plugin.jar"],
+    cmd = """
+set -euo pipefail
+tmp="$(@D)/plugin_jar"
+rm -rf "$$tmp"
+mkdir -p "$$tmp/classes" "$$tmp/resources/META-INF" "$$tmp/resources/icons"
+classes_jar="$$(pwd)/$$tmp/plugin_classes.jar"
+cp "$(location :plugin_classes.jar)" "$$classes_jar"
+(cd "$$tmp/classes" && jar -xf "$$classes_jar")
+cp "$(location :patched_plugin_xml)" "$$tmp/resources/META-INF/plugin.xml"
+cp "$(location src/main/resources/META-INF/lsp.xml)" "$$tmp/resources/META-INF/lsp.xml"
+cp "$(location src/main/resources/META-INF/pluginIcon.svg)" "$$tmp/resources/META-INF/pluginIcon.svg"
+cp "$(location src/main/resources/icons/tally.svg)" "$$tmp/resources/icons/tally.svg"
+jar --create --file "$@" -C "$$tmp/classes" . -C "$$tmp/resources" .
+""",
+)
+
+genrule(
+    name = "plugin_zip",
+    srcs = [
+        ":bundled_bins",
+        ":plugin_jar",
+    ],
+    outs = ["tally-intellij-plugin.zip"],
+    cmd = """
+set -euo pipefail
+tmp="$(@D)/plugin_zip"
+rm -rf "$$tmp"
+mkdir -p "$$tmp/%s/lib"
+cp "$(location :plugin_jar)" "$$tmp/%s/lib/tally-intellij-plugin.jar"
+bundled_locations="$(locations :bundled_bins)"
+for src in $$bundled_locations; do
+  if [ "$${src##*/}" = "empty_bundled_marker" ]; then
+    continue
+  fi
+  rel="$${src#*/bundled/bin/}"
+  if [ "$$rel" = "$$src" ]; then
+    rel="$${src#bundled/bin/}"
+  fi
+  mkdir -p "$$(dirname "$$tmp/%s/bin/$$rel")"
+  cp "$$src" "$$tmp/%s/bin/$$rel"
+done
+(cd "$$tmp" && zip -qr "$$(pwd)/../tally-intellij-plugin.zip" "%s")
+""" % (PLUGIN_NAME, PLUGIN_NAME, PLUGIN_NAME, PLUGIN_NAME, PLUGIN_NAME),
+)

@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "auto_other.go",
+        "auto_windows.go",
+        "auto_windows_common.go",
+        "theme.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/highlight/theme",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/highlight/core:go_default_library",
+        "@land_charm_lipgloss_v2//:go_default_library",
+    ] + select({
+        "@rules_go//go/platform:windows": [
+            "@org_golang_x_sys//windows/registry:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["theme_test.go"],
+    embed = [":go_default_library"],
+)

@@ -11,9 +11,11 @@ include _tools/shellcheck-wasm/versions.env
 # Build tags for the shipped full-featured build (keep CGO enabled while
 # disabling containers/image transports we do not ship).
 BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
+INTELLIJ_PLUGIN_VERSION := $(shell sed -n 's/^plugin_version = "\(.*\)"/\1/p' _integrations/intellij-tally/build/versions.toml | head -n 1)
 
 build: check-shellcheck-wasm
-	GOSUMDB=sum.golang.org CGO_ENABLED=1 go build -tags '$(BUILDTAGS)' -ldflags "-s -w" -o tally
+	TALLY_VERSION="$${TALLY_VERSION:-0.0.0-dev}" bazel build --config=release //:tally
+	cp bazel-bin/tally_/tally tally
 
 # Friendlier diagnostic than the raw `go:embed` error when the wasm artifact is
 # missing. We don't auto-build here because that would silently pull Docker on
@@ -28,10 +30,13 @@ check-shellcheck-wasm:
 	fi
 
 intellij-plugin:
-	bash _integrations/intellij-tally/build/build.sh build
+	bazel build --//:release_version="$(INTELLIJ_PLUGIN_VERSION)" //_integrations/intellij-tally:plugin_zip
+	mkdir -p _integrations/intellij-tally/dist
+	cp bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip \
+		_integrations/intellij-tally/dist/tally-intellij-plugin-$(INTELLIJ_PLUGIN_VERSION).zip
 
-intellij-plugin-verify:
-	bash _integrations/intellij-tally/build/build.sh verify
+intellij-plugin-verify: intellij-plugin
+	bash _integrations/intellij-tally/build/smoke.sh
 
 intellij-plugin-smoke:
 	bash _integrations/intellij-tally/build/smoke.sh
@@ -40,11 +45,10 @@ GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := $(shell cat .golangci-lint-version | tr -d '[:space:]')
 DEADCODE_VERSION := v0.41.0
 
-test: check-shellcheck-wasm bin/gotestsum-$(GOTESTSUM_VERSION)
-	bin/gotestsum-$(GOTESTSUM_VERSION) --format testname -- -tags '$(BUILDTAGS)' -race -count=1 -timeout=30s ./...
+test: check-shellcheck-wasm
+	bazel test --config=go --config=race //cmd/... //internal/... //_tools/...
 
-test-verbose: check-shellcheck-wasm bin/gotestsum-$(GOTESTSUM_VERSION)
-	bin/gotestsum-$(GOTESTSUM_VERSION) --format standard-verbose -- -tags '$(BUILDTAGS)' -race -count=1 -timeout=30s ./...
+test-verbose: test
 
 lint: check-shellcheck-wasm bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
 	bin/custom-gcl run

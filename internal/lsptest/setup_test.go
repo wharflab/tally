@@ -6,8 +6,10 @@ import (
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,6 +37,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+	originalWD, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
 
 	binaryName := "tally"
 	if runtime.GOOS == "windows" {
@@ -42,36 +48,59 @@ func TestMain(m *testing.M) {
 	}
 	binaryPath = filepath.Join(tmpDir, binaryName)
 
-	// Collect coverage only when GOCOVERDIR is set (Linux CI).
-	buildArgs := []string{"build"}
-	coverageDir = os.Getenv("GOCOVERDIR")
-	if coverageDir != "" {
-		coverageDir, err = filepath.Abs(coverageDir)
-		if err != nil {
+	if configured := os.Getenv("TALLY_LSPTEST_BINARY"); configured != "" {
+		configured = resolveConfiguredTestPath(configured)
+		if info, err := os.Stat(configured); err != nil {
 			_ = os.RemoveAll(tmpDir)
-			panic("failed to get absolute coverage directory path: " + err.Error())
-		}
-		if err := os.MkdirAll(coverageDir, 0o750); err != nil {
+			panic("failed to stat Bazel tally binary: " + err.Error())
+		} else if info.IsDir() {
 			_ = os.RemoveAll(tmpDir)
-			panic("failed to create coverage directory: " + err.Error())
+			panic("Bazel tally binary path is a directory: " + configured)
 		}
-		buildArgs = append(buildArgs, "-cover", "-covermode=atomic")
-	}
-	buildArgs = append(buildArgs, "-o", binaryPath, "github.com/wharflab/tally")
+		binaryPath = configured
+	} else {
+		// Collect coverage only when GOCOVERDIR is set (Linux CI).
+		buildArgs := []string{"build"}
+		coverageDir = os.Getenv("GOCOVERDIR")
+		if coverageDir != "" {
+			coverageDir, err = filepath.Abs(coverageDir)
+			if err != nil {
+				_ = os.RemoveAll(tmpDir)
+				panic("failed to get absolute coverage directory path: " + err.Error())
+			}
+			if err := os.MkdirAll(coverageDir, 0o750); err != nil {
+				_ = os.RemoveAll(tmpDir)
+				panic("failed to create coverage directory: " + err.Error())
+			}
+			buildArgs = append(buildArgs, "-cover", "-covermode=atomic")
+		}
+		buildArgs = append(buildArgs, "-o", binaryPath, "github.com/wharflab/tally")
 
-	cmd := exec.Command("go", buildArgs...)
-	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		_ = os.RemoveAll(tmpDir)
-		panic("failed to build binary: " + string(out))
+		cmd := exec.Command("go", buildArgs...)
+		cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			_ = os.RemoveAll(tmpDir)
+			panic("failed to build binary: " + string(out))
+		}
 	}
 
 	if err := warmShellCheckCache(tmpDir); err != nil {
 		_ = os.RemoveAll(tmpDir)
 		panic("failed to warm ShellCheck cache: " + err.Error())
 	}
+	if err := materializeBazelLSPWorkspace(tmpDir); err != nil {
+		if chdirErr := os.Chdir(originalWD); chdirErr != nil {
+			panic("failed to restore working directory: " + chdirErr.Error())
+		}
+		_ = os.RemoveAll(tmpDir)
+		panic("failed to materialize Bazel LSP workspace: " + err.Error())
+	}
 
 	code := m.Run()
+	if err := os.Chdir(originalWD); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		panic("failed to restore working directory: " + err.Error())
+	}
 	_ = os.RemoveAll(tmpDir)
 	os.Exit(code)
 }
@@ -100,6 +129,99 @@ func warmShellCheckCache(tmpDir string) error {
 		return fmt.Errorf("%w: %s", err, out)
 	}
 	return nil
+}
+
+func materializeBazelLSPWorkspace(tmpDir string) error {
+	if os.Getenv("TEST_SRCDIR") == "" {
+		return nil
+	}
+	workspace := filepath.Join(tmpDir, "workspace")
+	if err := copyTestTree("__snapshots__", filepath.Join(workspace, "internal", "lsptest", "__snapshots__")); err != nil {
+		return err
+	}
+	if err := copyTestTree(
+		filepath.Join("..", "integration", "fixtures"),
+		filepath.Join(workspace, "internal", "integration", "fixtures"),
+	); err != nil {
+		return err
+	}
+	packageDir := filepath.Join(workspace, "internal", "lsptest")
+	if err := os.MkdirAll(packageDir, 0o750); err != nil {
+		return err
+	}
+	if err := os.Chdir(packageDir); err != nil {
+		return err
+	}
+	return nil
+}
+
+func copyTestTree(src, dst string) error {
+	if _, err := os.Stat(src); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	return filepath.WalkDir(src, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o750)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
+			return nil
+		}
+		//nolint:gosec // Test-only Bazel runfile copy; symlinks are intentionally dereferenced.
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, info.Mode().Perm())
+	})
+}
+
+func resolveConfiguredTestPath(path string) string {
+	candidates := []string{path}
+	if !filepath.IsAbs(path) {
+		if absPath, err := filepath.Abs(path); err == nil {
+			candidates = append(candidates, absPath)
+		}
+		runfilesDir := os.Getenv("RUNFILES_DIR")
+		if runfilesDir == "" {
+			runfilesDir = os.Getenv("TEST_SRCDIR")
+		}
+		workspace := os.Getenv("TEST_WORKSPACE")
+		if runfilesDir != "" {
+			candidates = append(candidates, filepath.Join(runfilesDir, path))
+			if workspace != "" {
+				candidates = append(candidates, filepath.Join(runfilesDir, workspace, path))
+			}
+		}
+		if testSrcDir := os.Getenv("TEST_SRCDIR"); testSrcDir != "" && testSrcDir != runfilesDir {
+			candidates = append(candidates, filepath.Join(testSrcDir, path))
+			if workspace != "" {
+				candidates = append(candidates, filepath.Join(testSrcDir, workspace, path))
+			}
+		}
+	}
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return path
 }
 
 // processIO wraps subprocess stdin/stdout as an io.ReadWriteCloser

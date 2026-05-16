@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["plan.go"],
+    importpath = "github.com/wharflab/tally/internal/rules/asyncutil",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/async:go_default_library",
+        "//internal/registry:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+    ],
+)

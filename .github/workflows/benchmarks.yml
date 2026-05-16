@@ -20,15 +20,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - uses: ./.github/actions/shellcheck-wasm
-      - name: Setup Go
-        uses: actions/setup-go@v6
+      - uses: bazel-contrib/setup-bazel@0.19.0
         with:
-          go-version-file: go.mod
-          cache: true
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
         with:
           # Go only supports walltime mode currently
           mode: walltime
           # Use longer benchtime and multiple runs to reduce noise on shared runners
-          run: go test -bench=. -benchtime=5s -count=5 ./internal/integration/...
+          run: bazel test --config=go --test_output=streamed --test_arg=-test.bench=. --test_arg=-test.benchtime=5s --test_arg=-test.count=5 //internal/integration:go_default_test

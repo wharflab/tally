@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "cgo.go",
+        "cgo_nocgo.go",
+        "version.go",
+    ],
+    cgo = True,
+    importpath = "github.com/wharflab/tally/internal/version",
+    visibility = ["//:__subpackages__"],
+)

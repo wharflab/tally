@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,6 +41,15 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("create temporary directory: %w", err)
 	}
+	originalWD, err := os.Getwd()
+	if err != nil {
+		return 0, fmt.Errorf("get working directory: %w", err)
+	}
+	defer func() {
+		if err := os.Chdir(originalWD); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "restore working directory: %v\n", err)
+		}
+	}()
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -77,6 +87,9 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 	if err := finalizeMockRegistry(registryTmpConf); err != nil {
 		return 0, err
 	}
+	if err := materializeBazelIntegrationWorkspace(tmpDir); err != nil {
+		return 0, err
+	}
 
 	code := m.Run()
 	if mockRegistry != nil {
@@ -86,6 +99,11 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 }
 
 func buildIntegrationBinary(tmpDir string) error {
+	if configured, ok, err := configuredTestBinary("TALLY_INTEGRATION_BINARY"); ok || err != nil {
+		binaryPath = configured
+		return err
+	}
+
 	binaryName := "tally"
 	if runtime.GOOS == "windows" {
 		binaryName = "tally.exe"
@@ -118,6 +136,11 @@ func buildIntegrationBinary(tmpDir string) error {
 }
 
 func buildIntegrationAcpAgent(tmpDir string) error {
+	if configured, ok, err := configuredTestBinary("TALLY_ACP_AGENT_BINARY"); ok || err != nil {
+		acpAgentPath = configured
+		return err
+	}
+
 	binName := "tally-acp-testagent"
 	if runtime.GOOS == "windows" {
 		binName += ".exe"
@@ -138,6 +161,107 @@ func buildIntegrationAcpAgent(tmpDir string) error {
 		return fmt.Errorf("build ACP test agent: %w", err)
 	}
 	return nil
+}
+
+func configuredTestBinary(envName string) (string, bool, error) {
+	path := os.Getenv(envName)
+	if path == "" {
+		return "", false, nil
+	}
+	path = resolveConfiguredTestPath(path)
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", true, fmt.Errorf("stat %s path %q: %w", envName, path, err)
+	}
+	if info.IsDir() {
+		return "", true, fmt.Errorf("%s path %q is a directory", envName, path)
+	}
+	return path, true, nil
+}
+
+func materializeBazelIntegrationWorkspace(tmpDir string) error {
+	if os.Getenv("TEST_SRCDIR") == "" {
+		return nil
+	}
+	dst := filepath.Join(tmpDir, "workspace", "internal", "integration")
+	for _, name := range []string{"testdata", "fixtures", "__snapshots__"} {
+		if err := copyTestTree(name, filepath.Join(dst, name)); err != nil {
+			return fmt.Errorf("materialize %s: %w", name, err)
+		}
+	}
+	if err := os.Chdir(dst); err != nil {
+		return fmt.Errorf("chdir to materialized integration workspace: %w", err)
+	}
+	return nil
+}
+
+func copyTestTree(src, dst string) error {
+	if _, err := os.Stat(src); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	return filepath.WalkDir(src, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if entry.IsDir() {
+			return os.MkdirAll(target, 0o750)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
+			return nil
+		}
+		//nolint:gosec // Test-only Bazel runfile copy; symlinks are intentionally dereferenced.
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, info.Mode().Perm())
+	})
+}
+
+func resolveConfiguredTestPath(path string) string {
+	candidates := []string{path}
+	if !filepath.IsAbs(path) {
+		if absPath, err := filepath.Abs(path); err == nil {
+			candidates = append(candidates, absPath)
+		}
+		runfilesDir := os.Getenv("RUNFILES_DIR")
+		if runfilesDir == "" {
+			runfilesDir = os.Getenv("TEST_SRCDIR")
+		}
+		workspace := os.Getenv("TEST_WORKSPACE")
+		if runfilesDir != "" {
+			candidates = append(candidates, filepath.Join(runfilesDir, path))
+			if workspace != "" {
+				candidates = append(candidates, filepath.Join(runfilesDir, workspace, path))
+			}
+		}
+		if testSrcDir := os.Getenv("TEST_SRCDIR"); testSrcDir != "" && testSrcDir != runfilesDir {
+			candidates = append(candidates, filepath.Join(testSrcDir, path))
+			if workspace != "" {
+				candidates = append(candidates, filepath.Join(testSrcDir, workspace, path))
+			}
+		}
+	}
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return path
 }
 
 // installCachedBinary builds importPath via `go install` to a stable per-user

@@ -34,9 +34,7 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
   - ENV nodes are parsed as `(key, value, separator)` triples — walking `node.Next` as flat tokens gives wrong keys.
   - Heredoc `RunCommand.Location()` is multi-range: `[0]` = `RUN <<EOF` opener, `[1]` = first body line. `run.Files[0].Data` holds the body.
 - Keep `cmd/` as wiring only; put implementation in `internal/`.
-- When running `go build`, `go test`, or `go run` directly, pass
-  `-tags 'containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub'`.
-  - `make` targets handle this automatically.
+- Use Bazel for builds and tests. `make build` and `make test` are Bazel-backed convenience targets, and `.bazelrc` applies the release build tags.
 - `internal/shellcheck/wasm/shellcheck.wasm` is `.gitignored` — build it with `make shellcheck-wasm` (requires Docker).
   - `make build`/`make test`/`make lint`/`make deadcode` fail fast with a pointer if the wasm is missing.
   - Bump upstream versions via `_tools/shellcheck-wasm/versions.env` (`SHELLCHECK_VERSION`, `GHC_WASM_META_COMMIT`,
@@ -87,7 +85,7 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
 
 ## Hygiene
 
-- PREFER targeted `go test` first; run `make test` before finishing a larger change.
+- PREFER targeted `bazel test --config=go` first; run `make test` before finishing a larger change.
 - PREFER `make lint`/`make lint-fix` (custom wrapper) over running `golangci-lint` directly.
   - Custom analyzers live in `_tools/customlint/`; `make lint` builds and runs them via `bin/custom-gcl`.
   - `customlint/cmdliteral` triggers on ANY `"add"`/`"run"`/`"env"`/etc. string literal under `internal/` (except `internal/shell`), even when

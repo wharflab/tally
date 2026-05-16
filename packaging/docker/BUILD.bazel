@@ -1,0 +1,87 @@
+load("@rules_img//img:image.bzl", "image_from_binary", "image_index")
+load("@rules_img//img:load.bzl", "image_load")
+load("@rules_img//img:push.bzl", "image_push")
+
+package(default_visibility = ["//visibility:public"])
+
+IMAGE_LABELS = {
+    "org.opencontainers.image.description": "Dockerfile and Containerfile linter",
+    "org.opencontainers.image.licenses": "Apache-2.0",
+    "org.opencontainers.image.source": "https://github.com/wharflab/tally",
+    "org.opencontainers.image.title": "tally",
+    "org.opencontainers.image.version": "{{.VERSION}}",
+}
+
+IMAGE_BUILD_SETTINGS = {
+    "VERSION": "//:release_version",
+}
+
+PUSH_BUILD_SETTINGS = {
+    "REGISTRY": "//:container_registry",
+    "REPOSITORY": "//:container_repository",
+    "TAG": "//:container_tag",
+}
+
+image_from_binary(
+    name = "linux_amd64_image",
+    base = "@distroless_base_debian12_nonroot",
+    binary = "//:tally",
+    build_settings = IMAGE_BUILD_SETTINGS,
+    include_runfiles = False,
+    kind = "manifest",
+    labels = IMAGE_LABELS,
+    path = "usr/bin/tally",
+    platforms = ["@rules_img//img/private/platforms:linux_amd64"],
+    user = "nonroot",
+)
+
+image_from_binary(
+    name = "linux_arm64_image",
+    base = "@distroless_base_debian12_nonroot",
+    binary = "//:tally",
+    build_settings = IMAGE_BUILD_SETTINGS,
+    include_runfiles = False,
+    kind = "manifest",
+    labels = IMAGE_LABELS,
+    path = "usr/bin/tally",
+    platforms = ["@rules_img//img/private/platforms:linux_arm64"],
+    user = "nonroot",
+)
+
+image_index(
+    name = "linux_image",
+    manifests = [
+        ":linux_amd64_image",
+        ":linux_arm64_image",
+    ],
+)
+
+image_load(
+    name = "load_linux_amd64",
+    image = ":linux_amd64_image",
+    tag = "tally:linux-amd64",
+)
+
+image_load(
+    name = "load_linux_arm64",
+    image = ":linux_arm64_image",
+    tag = "tally:linux-arm64",
+)
+
+image_push(
+    name = "push_linux_amd64",
+    build_settings = PUSH_BUILD_SETTINGS,
+    image = ":linux_amd64_image",
+    registry = "{{.REGISTRY}}",
+    repository = "{{.REPOSITORY}}",
+    tag = "{{.TAG}}",
+)
+
+image_push(
+    name = "push_linux_arm64",
+    build_settings = PUSH_BUILD_SETTINGS,
+    image = ":linux_arm64_image",
+    registry = "{{.REGISTRY}}",
+    repository = "{{.REPOSITORY}}",
+    tag = "{{.TAG}}",
+)

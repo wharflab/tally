@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "json1.go",
+        "runner.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/shellcheck",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/shellcheck/wasm:go_default_library",
+        "@com_github_tetratelabs_wazero//:go_default_library",
+        "@com_github_tetratelabs_wazero//api:go_default_library",
+        "@com_github_tetratelabs_wazero//experimental:go_default_library",
+        "@com_github_tetratelabs_wazero//imports/wasi_snapshot_preview1:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["runner_test.go"],
+    embed = [":go_default_library"],
+)

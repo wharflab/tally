@@ -1,0 +1,51 @@
+load("@rules_go//go:def.bzl", "go_test")
+
+filegroup(
+    name = "fixtures",
+    srcs = glob(["fixtures/**"]),
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "ai_autofix_dl4001_test.go",
+        "benchmark_test.go",
+        "docker_plugin_test.go",
+        "error_test.go",
+        "fix_cases_test.go",
+        "fix_test.go",
+        "fixture_harness_test.go",
+        "gemini_smoke_test.go",
+        "harness_test.go",
+        "lint_cases_test.go",
+        "lint_test.go",
+        "main_test.go",
+        "orchestrator_test.go",
+        "stdin_test.go",
+        "version_test.go",
+    ],
+    data = glob([
+        "__snapshots__/**",
+        "fixtures/**",
+        "testdata/**",
+    ]) + [
+        "//:tally",
+        "//internal/ai/acp/testdata/testagent",
+    ],
+    env = {
+        "TALLY_ACP_AGENT_BINARY": "$(rootpath //internal/ai/acp/testdata/testagent)",
+        "TALLY_INTEGRATION_BINARY": "$(rootpath //:tally)",
+    },
+    deps = [
+        "//internal/ai/autofixdata:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/registry/testutil:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/version:go_default_library",
+        "@com_github_docker_cli//cli-plugins/metadata:go_default_library",
+        "@com_github_gkampitakis_go_snaps//snaps:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_pelletier_go_toml_v2//:go_default_library",
+    ],
+)

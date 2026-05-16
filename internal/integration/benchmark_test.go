@@ -25,6 +25,10 @@ func ensureBinary(b *testing.B) {
 	if benchBinaryPath != "" {
 		return
 	}
+	if binaryPath != "" {
+		benchBinaryPath = binaryPath
+		return
+	}
 
 	// Build the binary (this happens when running benchmarks without tests)
 	tmpDir := b.TempDir()

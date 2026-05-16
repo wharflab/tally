@@ -1,0 +1,58 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "cuda_version_mismatch.go",
+        "gate.go",
+        "no_buildtime_gpu_queries.go",
+        "no_container_runtime_in_image.go",
+        "no_hardcoded_visible_devices.go",
+        "no_redundant_cuda_install.go",
+        "prefer_minimal_driver_capabilities.go",
+        "prefer_runtime_final_stage.go",
+        "prefer_uv_over_conda.go",
+        "prefer_uv_over_conda_fix.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/rules/tally/gpu",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/ai/autofixdata:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/facts:go_default_library",
+        "//internal/patch:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "@com_github_distribution_reference//:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "cuda_version_mismatch_test.go",
+        "gate_test.go",
+        "no_buildtime_gpu_queries_test.go",
+        "no_container_runtime_in_image_test.go",
+        "no_hardcoded_visible_devices_test.go",
+        "no_redundant_cuda_install_test.go",
+        "prefer_minimal_driver_capabilities_test.go",
+        "prefer_runtime_final_stage_test.go",
+        "prefer_uv_over_conda_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/ai/autofixdata:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/facts:go_default_library",
+        "//internal/patch:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/testutil:go_default_library",
+        "@com_github_gkampitakis_go_snaps//snaps:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+    ],
+)

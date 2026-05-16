@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "coerce.go",
+        "validator.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/schemas/runtime",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/schemas:go_default_library",
+        "@com_github_google_jsonschema_go//jsonschema:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "coerce_test.go",
+        "validator_test.go",
+    ],
+    embed = [":go_default_library"],
+)

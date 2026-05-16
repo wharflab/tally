@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "require_stages.go",
+        "syntax.go",
+        "syntax_directive.go",
+        "unknown_instruction.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/syntax",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["syntax_test.go"],
+    embed = [":go_default_library"],
+    deps = ["@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library"],
+)

@@ -1,0 +1,20 @@
+load("@@rules_java+//java:defs.bzl", "java_import")
+
+package(default_visibility = ["//visibility:public"])
+
+java_import(
+    name = "ide_api",
+    jars = glob([
+        "lib/*.jar",
+        "plugins/lsp/lib/*.jar",
+    ], allow_empty = True),
+    neverlink = True,
+)
+
+filegroup(
+    name = "ide_jars",
+    srcs = glob([
+        "lib/*.jar",
+        "plugins/lsp/lib/*.jar",
+    ], allow_empty = True),
+)

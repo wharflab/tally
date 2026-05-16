@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "async_resolver.go",
+        "factory.go",
+        "resolver.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/registry",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/async:go_default_library",
+        "@com_github_cenkalti_backoff_v5//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["resolver_test.go"],
+    embed = [":go_default_library"],
+    deps = ["//internal/async:go_default_library"],
+)

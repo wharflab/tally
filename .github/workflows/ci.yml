@@ -60,12 +60,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/shellcheck-wasm
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - uses: bazel-contrib/setup-bazel@0.19.0
         with:
-          go-version-file: go.mod
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Build
-        run: go build ./...
+        run: bazel build --config=release //:tally
       - name: Verify PowerShell analyzer runtime
         shell: pwsh
         run: |
@@ -116,45 +119,8 @@ jobs:
 
             throw "PSScriptAnalyzer $requiredVersion is not installed, and neither Install-PSResource nor Install-Module is available in this pwsh environment."
           }
-      - name: Run unit tests with coverage
-        run: |
-          GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
-          make "$GOTESTSUM_BIN"
-          mkdir -p coverage
-          # Exclude scripts/* from coverage collection (they are tooling, not product code).
-          COVERPKG=$(go list ./... | grep -v '/scripts/' | paste -sd, -)
-          "$GOTESTSUM_BIN" --format testname --junitfile junit.xml -- \
-            -race -coverprofile=coverage.out -covermode=atomic -coverpkg="$COVERPKG" ./...
-      - name: Run integration tests with coverage
-        run: |
-          # Integration tests use -cover build and write binary coverage data
-          GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
-          GOCOVERDIR="$(pwd)/coverage" "$GOTESTSUM_BIN" --format testname --junitfile junit-integration.xml -- ./internal/integration/...
-      - name: Run LSP protocol tests with coverage
-        run: |
-          # LSP black-box tests launch tally lsp --stdio as a subprocess
-          GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
-          GOCOVERDIR="$(pwd)/coverage" "$GOTESTSUM_BIN" --format testname --junitfile junit-lsptest.xml -- ./internal/lsptest/...
-          # Convert all binary coverage data (integration + LSP) to text format.
-          go tool covdata textfmt -i=coverage -o=coverage-integration.txt
-          # Merge unit + black-box coverage into a single Go coverprofile for Codecov.
-          bash scripts/merge-go-coverprofiles.sh coverage-merged.out coverage.out coverage-integration.txt
-          # Force generated code to 100% coverage to avoid skewing project totals.
-          bash scripts/filter-go-coverprofile.sh coverage-merged.out coverage.filtered.out
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
-        with:
-          use_oidc: true
-          files: coverage.filtered.out
-          fail_ci_if_error: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6
-        with:
-          report_type: test_results
-          use_oidc: true
-          files: junit.xml,junit-integration.xml,junit-lsptest.xml
-          fail_ci_if_error: true
+      - name: Run Go tests
+        run: bazel test --config=go --config=race //cmd/... //internal/... //_tools/...
   test-windows:
     name: Test (Windows)
     needs: shellcheck-wasm
@@ -164,14 +130,26 @@ jobs:
       - uses: ./.github/actions/download-shellcheck-wasm
         with:
           artifact-name: shellcheck-wasm
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - uses: bazel-contrib/setup-bazel@0.19.0
         with:
-          go-version-file: go.mod
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          location: ${{ runner.temp }}
+          path-type: inherit
       - name: Build
-        run: go build ./...
+        shell: msys2 {0}
+        run: bazel build --config=release --config=windows-amd64 //:tally
       - name: Run tests
-        run: go test ./... -v -race
+        shell: msys2 {0}
+        run: bazel test --config=go --config=race --config=windows-amd64 //cmd/... //internal/...
   lint:
     runs-on: ubuntu-latest
     steps:

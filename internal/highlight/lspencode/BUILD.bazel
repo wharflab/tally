@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["encode.go"],
+    importpath = "github.com/wharflab/tally/internal/highlight/lspencode",
+    visibility = ["//:__subpackages__"],
+    deps = ["//internal/highlight/core:go_default_library"],
+)

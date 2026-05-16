@@ -29,8 +29,12 @@ common mistakes.
 
 ## Build, Test, and Development Commands
 
-- `make build`: builds the `tally` binary into the repo root
-- `make test`: runs `go test -race -count=1 -timeout=30s ./...`
+- `bazel build --config=release //:tally`: builds the shipped `tally` binary
+- `bazel test --config=go --config=race //cmd/... //internal/... //_tools/...`: runs the main Go test suite with the release build tags and race
+  detector
+- `bazel run //:gazelle`: regenerates Go `BUILD.bazel` files from `go.mod`
+- `make build`: Bazel-backed convenience target that builds `tally` into the repo root
+- `make test`: Bazel-backed convenience target for the main Go test suite
 - `make lint`: runs `golangci-lint` for CI (no auto-fix)
 - `make lint-fix`: runs `golangci-lint` with `--fix` for local development
 - `make cpd`: runs PMD Copy/Paste Detector to find duplicate code (100 token threshold, excludes tests)
@@ -50,7 +54,7 @@ common mistakes.
 
 ## JSON v2 Notice
 
-- This repo uses Go JSON v2 experiment: `GOEXPERIMENT=jsonv2` must be set for Go commands.
+- This repo uses Go JSON v2 experiment: `GOEXPERIMENT=jsonv2` must be set for Go commands. Bazel and Make configure this automatically.
 - Prefer `encoding/json/v2` (and `encoding/json/jsontext`) for all JSON code.
 - Avoid `encoding/json` except explicit compatibility boundaries (for example APIs that require v1 types).
 

@@ -4,6 +4,9 @@ bunfig.toml
 bun.lock
 node_modules/**
 test/**
+tools/**
+extension_bundle__*.js
+package_vscode_extension*
 .oxfmtrc.json
 .oxlintrc.json
 bundled/bin/.gitkeep

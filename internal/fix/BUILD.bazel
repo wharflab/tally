@@ -1,0 +1,63 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "conflict.go",
+        "dl4001_cleanup_resolver.go",
+        "epilogue_order_resolver.go",
+        "finalizer.go",
+        "fix.go",
+        "fixer.go",
+        "fixmodes.go",
+        "heredoc_format_finalizer.go",
+        "heredoc_resolver.go",
+        "newline_resolver.go",
+        "resolver.go",
+        "revalidate.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/fix",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/directive:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/heredoc:go_default_library",
+        "//internal/heredocfmt:go_default_library",
+        "//internal/psanalyzer:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/runmount:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "conflict_test.go",
+        "dl4001_cleanup_resolver_test.go",
+        "fix_test.go",
+        "fixer_precedence_test.go",
+        "fixer_test.go",
+        "heredoc_format_finalizer_test.go",
+        "heredoc_resolver_test.go",
+        "interaction_debug_test.go",
+        "resolver_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/psanalyzer:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/rules/all:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)

@@ -1,0 +1,19 @@
+exports_files(
+    [
+        "package.json",
+        "platform-targets.json",
+    ],
+    visibility = ["//_integrations/zed-tally:__pkg__"],
+)
+
+alias(
+    name = "package_json",
+    actual = "package.json",
+    visibility = ["//_integrations/zed-tally:__pkg__"],
+)
+
+alias(
+    name = "platform_targets_json",
+    actual = "platform-targets.json",
+    visibility = ["//_integrations/zed-tally:__pkg__"],
+)

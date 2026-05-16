@@ -1,0 +1,77 @@
+load("@rules_bun//bun:defs.bzl", "bun_binary", "bun_bundle", "bun_script")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "sources",
+    srcs = glob([
+        ".oxfmtrc.json",
+        ".oxlintrc.json",
+        ".vscodeignore",
+        "assets/**",
+        "bunfig.toml",
+        "package.json",
+        "README.md",
+        "src/**",
+        "test/**",
+        "tools/**",
+        "tsconfig.json",
+    ]) + ["//:license"],
+)
+
+bun_bundle(
+    name = "extension_bundle",
+    build_flags = ["--sourcemap=inline"],
+    data = [":sources"],
+    entry_points = ["src/extension.ts"],
+    external = ["vscode"],
+    format = "cjs",
+    node_modules = "@vscode_tally_bun_deps//:node_modules",
+    target = "node",
+)
+
+bun_script(
+    name = "typecheck",
+    data = [":sources"],
+    node_modules = "@vscode_tally_bun_deps//:node_modules",
+    package_json = "package.json",
+    script = "typecheck",
+)
+
+bun_script(
+    name = "lint",
+    data = [":sources"],
+    node_modules = "@vscode_tally_bun_deps//:node_modules",
+    package_json = "package.json",
+    script = "lint",
+)
+
+bun_script(
+    name = "format_check",
+    data = [":sources"],
+    node_modules = "@vscode_tally_bun_deps//:node_modules",
+    package_json = "package.json",
+    script = "format:check",
+)
+
+bun_script(
+    name = "vsce_package",
+    data = [
+        ":sources",
+        ":extension_bundle",
+    ],
+    node_modules = "@vscode_tally_bun_deps//:node_modules",
+    package_json = "package.json",
+    script = "vsce:package",
+)
+
+bun_binary(
+    name = "package_vscode_extension",
+    data = [
+        ":extension_bundle",
+        ":sources",
+    ],
+    entry_point = "tools/package-vsix.js",
+    node_modules = "@vscode_tally_bun_deps//:node_modules",
+    working_dir = "entry_point",
+)

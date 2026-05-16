@@ -1,0 +1,54 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "blocking.go",
+        "parse.go",
+        "register.go",
+        "resolver.go",
+        "validate.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/ai/autofix",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/ai/acp:go_default_library",
+        "//internal/ai/autofixdata:go_default_library",
+        "//internal/config:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/fix:go_default_library",
+        "//internal/linter:go_default_library",
+        "//internal/patch:go_default_library",
+        "//internal/processor:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_zricethezav_gitleaks_v8//detect:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "parse_test.go",
+        "prompt_test.go",
+        "resolver_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/ai/acp:go_default_library",
+        "//internal/ai/autofixdata:go_default_library",
+        "//internal/config:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/fix:go_default_library",
+        "//internal/patch:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/rules/hadolint:go_default_library",
+        "//internal/rules/tally:go_default_library",
+        "//internal/testutil:go_default_library",
+        "@com_github_gkampitakis_go_snaps//snaps:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+        "@com_github_zricethezav_gitleaks_v8//config:go_default_library",
+        "@com_github_zricethezav_gitleaks_v8//detect:go_default_library",
+        "@com_github_zricethezav_gitleaks_v8//regexp:go_default_library",
+    ],
+)

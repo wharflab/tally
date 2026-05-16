@@ -1,0 +1,8 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["server.go"],
+    importpath = "github.com/wharflab/tally/_tools/customlint/testdata/src/internal/lspserver",
+    visibility = ["//_tools/customlint/testdata/src:__subpackages__"],
+)

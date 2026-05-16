@@ -1,0 +1,49 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "async.go",
+        "cache_mounts_data.go",
+        "dl4001_data.go",
+        "dynamic.go",
+        "env_edit.go",
+        "epilogue_order_data.go",
+        "git_run_context.go",
+        "git_source_data.go",
+        "heredoc_data.go",
+        "location.go",
+        "newline_data.go",
+        "registry.go",
+        "rule.go",
+        "severity.go",
+        "violation.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/rules",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/async:go_default_library",
+        "//internal/facts:go_default_library",
+        "//internal/invocation:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "dynamic_test.go",
+        "location_test.go",
+        "registry_test.go",
+        "rule_test.go",
+        "severity_test.go",
+        "violation_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = ["@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library"],
+)

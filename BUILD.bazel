@@ -1,0 +1,68 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@gazelle//:def.bzl", "gazelle")
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+# gazelle:prefix github.com/wharflab/tally
+# gazelle:go_naming_convention go_default_library
+# gazelle:exclude _integrations/vscode-tally/node_modules
+# gazelle:exclude _integrations/vscode-tally/.vscode-test
+# gazelle:exclude _integrations/vscode-tally/dist
+# gazelle:exclude _integrations/intellij-tally/.cache
+# gazelle:exclude _integrations/intellij-tally/dist
+# gazelle:exclude _integrations/intellij-tally/out
+# gazelle:exclude _integrations/zed-tally/target
+# gazelle:exclude bin
+# gazelle:exclude dist
+
+string_flag(
+    name = "release_version",
+    build_setting_default = "0.0.0-dev",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "container_registry",
+    build_setting_default = "ghcr.io",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "container_repository",
+    build_setting_default = "wharflab/tally",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "container_tag",
+    build_setting_default = "dev",
+    visibility = ["//visibility:public"],
+)
+
+gazelle(
+    name = "gazelle",
+)
+
+filegroup(
+    name = "license",
+    srcs = ["LICENSE"],
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/wharflab/tally",
+    visibility = ["//visibility:private"],
+    deps = ["//cmd/tally/cmd:go_default_library"],
+)
+
+go_binary(
+    name = "tally",
+    embed = [":go_default_library"],
+    pure = "off",
+    visibility = ["//visibility:public"],
+    x_defs = {
+        "github.com/wharflab/tally/internal/version.commit": "{STABLE_TALLY_COMMIT}",
+        "github.com/wharflab/tally/internal/version.version": "{STABLE_TALLY_VERSION}",
+    },
+)

@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/wharflab/tally/internal/ai/acp/testdata/testagent",
+    visibility = ["//visibility:private"],
+    deps = ["@com_github_coder_acp_go_sdk//:go_default_library"],
+)
+
+go_binary(
+    name = "testagent",
+    embed = [":go_default_library"],
+    visibility = ["//:__subpackages__"],
+)

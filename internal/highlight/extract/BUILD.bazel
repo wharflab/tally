@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "blank.go",
+        "script.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/highlight/extract",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/dockerfile:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["script_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/dockerfile:go_default_library",
+        "//internal/sourcemap:go_default_library",
+    ],
+)

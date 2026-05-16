@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${EXT_DIR}/../.." && pwd)"
 VERSIONS_FILE="${SCRIPT_DIR}/versions.toml"
 LIB_FILE="${SCRIPT_DIR}/lib.sh"
 
@@ -50,7 +51,9 @@ ensure_plugin_zip() {
   plugin_version="$(read_version plugin_version)"
   plugin_zip="${EXT_DIR}/dist/tally-intellij-plugin-${plugin_version}.zip"
   if [[ ! -f "${plugin_zip}" ]]; then
-    bash "${SCRIPT_DIR}/build.sh" build >&2
+    (cd "${REPO_ROOT}" && bazel build --//:release_version="${plugin_version}" //_integrations/intellij-tally:plugin_zip) >&2
+    mkdir -p "${EXT_DIR}/dist"
+    cp "${REPO_ROOT}/bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip" "${plugin_zip}"
   fi
   echo "${plugin_zip}"
 }

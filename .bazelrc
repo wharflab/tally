@@ -1,0 +1,47 @@
+common --enable_bzlmod
+common --experimental_isolated_extension_usages
+common --enable_platform_specific_config
+
+# Required until encoding/json/v2 graduates from the Go experiment gate.
+build --action_env=GOEXPERIMENT=jsonv2
+build --repo_env=GOEXPERIMENT=jsonv2
+build:linux --sandbox_add_mount_pair=/tmp
+build:macos --sandbox_add_mount_pair=/var/tmp
+build:windows --sandbox_add_mount_pair=C:\Temp
+test --test_env=GOEXPERIMENT=jsonv2
+
+# Keep CI and local runs deterministic enough for build debugging.
+build --announce_rc
+build --show_timestamps
+test --test_output=errors
+
+# Shipped binary shape. This matches the previous Makefile/release build tags.
+build:release --stamp
+build:release --workspace_status_command=tools/bazel/workspace_status.sh
+build:release --compilation_mode=opt
+build:release --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
+
+# Go test jobs use the full feature set too, so registry-backed rules are not
+# silently dropped under Bazel.
+test:go --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
+
+# Preserve the previous `go test -race` behavior for Makefile and CI test jobs.
+test:race --@rules_go//go/config:race
+
+# Windows builds need cgo for tree-sitter grammar bindings. Use hermetic zig cc
+# toolchains instead of Bazel's Windows C++ autodetection so CI covers amd64 and
+# arm64 consistently.
+build:windows-amd64 --platforms=@zig_sdk//platform:windows_amd64
+build:windows-amd64 --extra_toolchains=@zig_sdk//toolchain:windows_amd64
+test:windows-amd64 --platforms=@zig_sdk//platform:windows_amd64
+test:windows-amd64 --extra_toolchains=@zig_sdk//toolchain:windows_amd64
+build:windows-arm64 --platforms=@zig_sdk//platform:windows_arm64
+build:windows-arm64 --extra_toolchains=@zig_sdk//toolchain:windows_arm64
+test:windows-arm64 --platforms=@zig_sdk//platform:windows_arm64
+test:windows-arm64 --extra_toolchains=@zig_sdk//toolchain:windows_arm64
+
+# Zed extensions are shipped as wasm32-wasip2 shared libraries.
+test:zed-linux --platforms=@rules_rs//rs/experimental/platforms:x86_64-unknown-linux-gnu
+test:zed-linux --extra_execution_platforms=@rules_rs//rs/experimental/platforms:x86_64-unknown-linux-gnu
+build:zed-wasm --platforms=@rules_rs//rs/experimental/platforms:wasm32-wasip2
+build:zed-linux-exec --extra_execution_platforms=@rules_rs//rs/experimental/platforms:x86_64-unknown-linux-gnu

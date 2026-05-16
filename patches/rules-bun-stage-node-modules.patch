@@ -1,0 +1,105 @@
+--- a/internal/bun_build_support.bzl
++++ b/internal/bun_build_support.bzl
+@@ -5,8 +5,9 @@
+
+ _STAGED_BUILD_RUNNER = """import { spawnSync } from "node:child_process";
+ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+-import { tmpdir } from "node:os";
++import { existsSync, readdirSync, symlinkSync } from "node:fs";
+ import { dirname, resolve } from "node:path";
++import { tmpdir } from "node:os";
+
+ const [, , manifestPath, ...buildArgs] = process.argv;
+ const execroot = process.cwd();
+@@ -16,6 +17,82 @@
+   return `${flag}=${resolve(execroot, value)}`;
+ }
+
++function findPackageDir() {
++  for (const arg of buildArgs) {
++    if (!arg || arg.startsWith("-")) {
++      continue;
++    }
++
++    const candidate = resolve(stageDir, arg);
++    if (!existsSync(candidate)) {
++      continue;
++    }
++
++    let dir = dirname(candidate);
++    for (;;) {
++      if (existsSync(resolve(dir, "package.json"))) {
++        return dir;
++      }
++      if (dir === stageDir) {
++        break;
++      }
++      const parent = dirname(dir);
++      if (parent === dir) {
++        break;
++      }
++      dir = parent;
++    }
++  }
++
++  return null;
++}
++
++function findExternalNodeModules() {
++  const externalDir = resolve(stageDir, "external");
++  if (!existsSync(externalDir)) {
++    return [];
++  }
++
++  const found = [];
++  function walk(dir, depth) {
++    if (depth > 3) {
++      return;
++    }
++    for (const entry of readdirSync(dir, { withFileTypes: true })) {
++      if (!entry.isDirectory()) {
++        continue;
++      }
++      const child = resolve(dir, entry.name);
++      if (entry.name === "node_modules") {
++        found.push(child);
++        continue;
++      }
++      walk(child, depth + 1);
++    }
++  }
++
++  walk(externalDir, 0);
++  return found.sort();
++}
++
++function linkExternalNodeModulesIntoPackage() {
++  const packageDir = findPackageDir();
++  const source = findExternalNodeModules()[0];
++  if (!packageDir || !source) {
++    return;
++  }
++  const dest = resolve(packageDir, "node_modules");
++  if (existsSync(dest)) {
++    return;
++  }
++
++  try {
++    symlinkSync(source, dest, process.platform === "win32" ? "junction" : "dir");
++  } catch (_) {
++    cpSync(source, dest, { dereference: true, force: true, recursive: true });
++  }
++}
++
+ try {
+   for (const relpath of readFileSync(manifestPath, "utf8").split(/\\r?\\n/)) {
+     if (!relpath) {
+@@ -27,6 +104,8 @@
+     cpSync(src, dest, { dereference: true, force: true, recursive: true });
+   }
+
++  linkExternalNodeModulesIntoPackage();
++
+   const forwardedArgs = [];
+   for (let index = 0; index < buildArgs.length; index += 1) {
+     const arg = buildArgs[index];
