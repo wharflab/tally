@@ -27,6 +27,8 @@ func prependConfiguredGoToPath() {
 	if err == nil {
 		_ = os.Setenv("TALLY_REAL_GO_BINARY", goBinary)
 		wrapper := filepath.Join(wrapperDir, "go")
+		// analysistest compares `go env GOROOT` to runtime.GOROOT(). rules_go
+		// test binaries report the synthetic token "GOROOT", so mirror it here.
 		const script = `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "env" && "${2:-}" == "GOROOT" ]]; then
