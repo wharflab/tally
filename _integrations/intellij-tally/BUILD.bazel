@@ -4,11 +4,17 @@ load("//tools/bazel:expand_template.bzl", "expand_template")
 package(default_visibility = ["//visibility:public"])
 
 PLUGIN_ID = "io.github.wharflab.tally"
+
 PLUGIN_NAME = "Tally"
+
 PLUGIN_SINCE_BUILD = "252.25557"
 
 KOTLIN_SRCS = glob(["src/main/kotlin/**/*.kt"])
-BUNDLED_BINS = glob(["bundled/bin/**"], allow_empty = True)
+
+BUNDLED_BINS = glob(
+    ["bundled/bin/**"],
+    allow_empty = True,
+)
 
 RESOURCE_SRCS = [
     "src/main/resources/META-INF/lsp.xml",
@@ -50,9 +56,9 @@ kt_jvm_library(
     name = "plugin_classes",
     srcs = KOTLIN_SRCS,
     deps = [
+        "@intellij_webstorm_sdk//:ide_api",
         "@rules_kotlin//kotlin/compiler:kotlin-stdlib",
         "@rules_kotlin//kotlin/compiler:kotlin-stdlib-jdk8",
-        "@intellij_webstorm_sdk//:ide_api",
     ],
 )
 

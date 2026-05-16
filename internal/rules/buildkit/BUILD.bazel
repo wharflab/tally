@@ -65,9 +65,9 @@ go_test(
         "workdir_relative_path_test.go",
     ],
     data = [
+        "//:go_module_files",
         "@buildkit_source//:dockerfile_ruleset_go",
         "@buildkit_source//:dockerfile_sources",
-        "//:go_module_files",
     ],
     embed = [":go_default_library"],
     env = {

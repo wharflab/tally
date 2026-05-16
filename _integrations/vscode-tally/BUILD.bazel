@@ -57,8 +57,8 @@ bun_script(
 bun_script(
     name = "vsce_package",
     data = [
-        ":sources",
         ":extension_bundle",
+        ":sources",
     ],
     node_modules = "@vscode_tally_bun_deps//:node_modules",
     package_json = "package.json",

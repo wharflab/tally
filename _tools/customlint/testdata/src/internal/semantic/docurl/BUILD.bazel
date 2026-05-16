@@ -1,8 +1,0 @@
-load("@rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "go_default_library",
-    srcs = ["docurl.go"],
-    importpath = "github.com/wharflab/tally/_tools/customlint/testdata/src/internal/semantic/docurl",
-    visibility = ["//_tools/customlint/testdata/src:__subpackages__"],
-)
