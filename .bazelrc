@@ -9,6 +9,12 @@ build:linux --sandbox_add_mount_pair=/tmp
 build:macos --sandbox_add_mount_pair=/var/tmp
 build:windows --sandbox_add_mount_pair=C:\Temp
 
+# rules_img container targets transition the Go binary to Linux target platforms.
+# tally uses cgo/tree-sitter sources, so macOS needs Linux C toolchains available
+# for local `bazel build //packaging/docker:linux_image`.
+build:macos --extra_toolchains=@zig_sdk//toolchain:linux_amd64_gnu.2.17
+build:macos --extra_toolchains=@zig_sdk//toolchain:linux_arm64_gnu.2.17
+
 # Keep CI and local runs deterministic enough for build debugging.
 build --announce_rc
 build --show_timestamps
