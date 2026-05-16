@@ -3,11 +3,6 @@
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
 
-# Pinned versions for the embedded ShellCheck wasm. Changing any value here
-# invalidates the local file-target, the CI cache, and the release workflow's
-# restored artifact. See _tools/shellcheck-wasm/versions.env.
-include _tools/shellcheck-wasm/versions.env
-
 # Build tags for the shipped full-featured build (keep CGO enabled while
 # disabling containers/image transports we do not ship).
 BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
@@ -24,7 +19,7 @@ build: check-shellcheck-wasm
 check-shellcheck-wasm:
 	@if [ ! -s internal/shellcheck/wasm/shellcheck.wasm ]; then \
 		echo "internal/shellcheck/wasm/shellcheck.wasm is missing."; \
-		echo "Run 'make shellcheck-wasm' (requires Docker) to build it, or"; \
+		echo "Run 'make shellcheck-wasm' (Bazel-backed, requires Docker) to build it, or"; \
 		echo "download the artifact from a recent CI run."; \
 		exit 1; \
 	fi
@@ -146,36 +141,25 @@ lsp-protocol:
 	bun run _tools/lspgen/fetchModel.mts
 	bun run _tools/lspgen/generate.mts
 
-# File target: the embedded ShellCheck wasm. Prerequisites list every input
-# that can change the output, so Make only rebuilds when the pins, the
-# Dockerfile, the Reactor, or the ast-grep rewrites change. The artifact is
-# .gitignored; fresh checkouts build it on demand (or restore it from CI cache).
+# File target: the embedded ShellCheck wasm. Bazel owns the actual build and
+# tracks the pins, Dockerfile, Reactor, and ast-grep rewrite inputs. The
+# artifact is .gitignored; this target materializes Bazel's declared output
+# into the source location needed by raw `go build`/`go test` tools.
 SHELLCHECK_WASM := internal/shellcheck/wasm/shellcheck.wasm
-SHELLCHECK_WASM_INPUTS := \
-	_tools/shellcheck-wasm/versions.env \
-	_tools/shellcheck-wasm/Dockerfile \
-	_tools/shellcheck-wasm/Reactor.hs \
-	$(wildcard _tools/shellcheck-wasm/rewrites/*.yml)
 
-shellcheck-wasm: $(SHELLCHECK_WASM)
+shellcheck-wasm:
+	@mkdir -p $(dir $(SHELLCHECK_WASM))
+	bazel build //_tools/shellcheck-wasm:shellcheck_wasm
+	cp bazel-bin/_tools/shellcheck-wasm/shellcheck.wasm $(SHELLCHECK_WASM)
+	@touch $(SHELLCHECK_WASM)
 
-$(SHELLCHECK_WASM): $(SHELLCHECK_WASM_INPUTS)
-	@mkdir -p $(dir $@)
-	docker buildx build \
-		--progress=plain \
-		--build-arg GHC_WASM_META_COMMIT="$(GHC_WASM_META_COMMIT)" \
-		--build-arg SHELLCHECK_VERSION="$(patsubst v%,%,$(SHELLCHECK_VERSION))" \
-		--build-arg AST_GREP_VERSION="$(AST_GREP_VERSION)" \
-		-t tally-shellcheck-wasm -f _tools/shellcheck-wasm/Dockerfile _tools/shellcheck-wasm
-	# Extract the built shellcheck.wasm from the container.
-	docker cp "$$(docker create --rm tally-shellcheck-wasm):/shellcheck.wasm" $@
-	@touch $@
+$(SHELLCHECK_WASM): shellcheck-wasm ;
 
 # Force-rebuild target kept for humans who want to refresh after pulling new
 # upstream ShellCheck source without touching a pinned version.
 update-shellcheck-wasm:
 	rm -f $(SHELLCHECK_WASM)
-	$(MAKE) $(SHELLCHECK_WASM)
+	$(MAKE) shellcheck-wasm
 
 clean:
 	rm -f tally

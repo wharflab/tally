@@ -127,7 +127,7 @@ local postMergeSteps = new Mapping<String, Step> {
 local prePushSteps = new Mapping<String, Step> {
   ["shellcheck-wasm"] {
     check =
-      "test -s internal/shellcheck/wasm/shellcheck.wasm || (echo \"internal/shellcheck/wasm/shellcheck.wasm is missing. Run 'make shellcheck-wasm' (requires Docker) to build it, or download the artifact from a recent CI run.\"; exit 1)"
+      "test -s internal/shellcheck/wasm/shellcheck.wasm || (echo \"internal/shellcheck/wasm/shellcheck.wasm is missing. Run 'make shellcheck-wasm' (Bazel-backed, requires Docker) to build it, or download the artifact from a recent CI run.\"; exit 1)"
   }
   ["build"] {
     check =

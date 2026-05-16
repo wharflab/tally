@@ -14,8 +14,9 @@ This section reflects current repository behavior, not the older proposal langua
 - ShellCheck is embedded as WASM at `internal/shellcheck/wasm/shellcheck.wasm`.
 - Runtime wrapper is `internal/shellcheck/runner.go` (wazero, in-process, JSON1 parser).
 - Build pipeline is in:
+  - `_tools/shellcheck-wasm/BUILD.bazel`
   - `_tools/shellcheck-wasm/Dockerfile`
-  - `Makefile` targets `update-shellcheck-wasm` and `update-shellcheck-wasm-host`
+  - `Makefile` target `update-shellcheck-wasm`
 - Build-time ast-grep rewrites are already applied from `_tools/shellcheck-wasm/rewrites/*.yml` with preflight/idempotence enforcement.
 
 ### 1.2 ShellCheck rule surface in tally
