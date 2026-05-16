@@ -47,14 +47,9 @@ jobs:
       - name: Build tally
         run: bazel build --config=release //:tally
       - name: Build IntelliJ plugin
-        run: |
-          set -euo pipefail
-          bazel build --//:release_version=0.1.0-dev //_integrations/intellij-tally:plugin_zip
-          mkdir -p _integrations/intellij-tally/dist
-          cp bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip \
-            _integrations/intellij-tally/dist/tally-intellij-plugin-0.1.0-dev.zip
+        run: make intellij-plugin
       - name: Run IntelliJ plugin verifier
-        run: make intellij-plugin-verify
+        run: bash _integrations/intellij-tally/build/smoke.sh
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v7
         with:

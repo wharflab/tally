@@ -27,7 +27,7 @@ check-shellcheck-wasm:
 intellij-plugin:
 	bazel build --//:release_version="$(INTELLIJ_PLUGIN_VERSION)" //_integrations/intellij-tally:plugin_zip
 	mkdir -p _integrations/intellij-tally/dist
-	cp bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip \
+	install -m 0644 bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip \
 		_integrations/intellij-tally/dist/tally-intellij-plugin-$(INTELLIJ_PLUGIN_VERSION).zip
 
 intellij-plugin-verify: intellij-plugin
