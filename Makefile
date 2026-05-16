@@ -9,8 +9,12 @@ BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_i
 INTELLIJ_PLUGIN_VERSION := $(shell sed -n 's/^plugin_version = "\(.*\)"/\1/p' _integrations/intellij-tally/build/versions.toml | head -n 1)
 
 build: check-shellcheck-wasm
-	TALLY_VERSION="$${TALLY_VERSION:-0.0.0-dev}" bazel build --config=release --embed_label="$${TALLY_VERSION:-0.0.0-dev}" //:tally
-	cp bazel-bin/tally_/tally tally
+	TALLY_VERSION="$${TALLY_VERSION:-0.0.0-dev}"; \
+	bazel build --config=release --embed_label="$$TALLY_VERSION" //:tally; \
+	src="$$(tools/bazel/target_output.sh --config=release --embed_label="$$TALLY_VERSION" //:tally)"; \
+	dst=tally; \
+	case "$$src" in *.exe) dst=tally.exe ;; esac; \
+	cp "$$src" "$$dst"
 
 # Friendlier diagnostic than the raw `go:embed` error when the wasm artifact is
 # missing. We don't auto-build here because that would silently pull Docker on
