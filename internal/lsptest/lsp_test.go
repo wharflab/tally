@@ -466,6 +466,8 @@ func TestLSP_ExecuteCommandApplyAllFixes(t *testing.T) {
 // TestLSP_ExecuteCommandApplyAllFixesRealWorld runs fix-all (with iterative mode)
 // on the same real-world Dockerfile used by TestLSP_FormattingRealWorld.
 // The VS Code smoke test uses this snapshot as the expected fix-all output.
+//
+//nolint:paralleltest
 func TestLSP_ExecuteCommandApplyAllFixesRealWorld(t *testing.T) {
 	// This fixture drives iterative fix-all over a large real-world Dockerfile.
 	// Keep it serial so CI does not run it alongside every other LSP subprocess.
