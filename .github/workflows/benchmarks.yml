@@ -27,10 +27,18 @@ jobs:
           external-cache: true
           repository-cache: true
           cache-save: ${{ github.event_name != 'pull_request' }}
+      - name: Build benchmark binaries
+        id: benchmark-binaries
+        run: |
+          bazel build --config=release //:tally //internal/ai/acp/testdata/testagent
+          echo "tally=$(pwd)/$(tools/bazel/target_output.sh --config=release //:tally)" >> "$GITHUB_OUTPUT"
+          echo "acp_agent=$(pwd)/$(tools/bazel/target_output.sh --config=release //internal/ai/acp/testdata/testagent)" >> "$GITHUB_OUTPUT"
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
         with:
           # Go only supports walltime mode currently
           mode: walltime
-          # Use longer benchtime and multiple runs to reduce noise on shared runners
-          run: bazel test --config=go --test_output=streamed --test_arg=-test.bench=. --test_arg=-test.benchtime=5s --test_arg=-test.count=5 //internal/integration:go_default_test
+          run: go test -bench=. ./internal/integration
+        env:
+          TALLY_ACP_AGENT_BINARY: ${{ steps.benchmark-binaries.outputs.acp_agent }}
+          TALLY_INTEGRATION_BINARY: ${{ steps.benchmark-binaries.outputs.tally }}
