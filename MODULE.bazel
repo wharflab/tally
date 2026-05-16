@@ -25,9 +25,9 @@ git_override(
 
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.from_file(
+    name = "tally_go_sdk",
     experiments = ["jsonv2"],
     go_mod = "//:go.mod",
-    name = "tally_go_sdk",
 )
 use_repo(go_sdk, "tally_go_sdk")
 
@@ -114,6 +114,14 @@ use_repo(
 )
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "buildkit_source",
+    build_file = "//third_party:buildkit_source.BUILD.bazel",
+    sha256 = "8308c61f71b42e00b24a3233b7ceeb4d0e6cb7e1a248bd23fba2bb69c952cc5b",
+    strip_prefix = "github.com/moby/buildkit@v0.30.0",
+    urls = ["https://proxy.golang.org/github.com/moby/buildkit/@v/v0.30.0.zip"],
+)
 
 http_archive(
     name = "intellij_webstorm_sdk",
