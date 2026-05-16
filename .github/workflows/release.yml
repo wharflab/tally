@@ -36,8 +36,6 @@ env:
   RELEASE_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
   GEM_DRY_RUN_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0.pre.{0}.{1}', github.event.pull_request.number, github.run_number) || '' }}
   BUILD_TAGS: containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
-  WINDOWS_BUILDKIT_VERSION: v0.30.0
-  WINDOWS_BUILDX_VERSION: v0.32.1
 jobs:
   preflight:
     runs-on: ubuntu-latest
@@ -478,10 +476,15 @@ jobs:
         id: buildkit
         if: matrix.id == 'windows-amd64'
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           Write-Host "Installing BuildKit..."
 
-          $version = "${{ env.WINDOWS_BUILDKIT_VERSION }}"
+          $version = (gh release view --repo moby/buildkit --json tagName --jq .tagName).Trim()
+          if (-not $version) {
+            throw "Unable to resolve latest BuildKit release"
+          }
           $arch = "amd64"
 
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -564,10 +567,15 @@ jobs:
         if: matrix.id == 'windows-amd64'
         id: dockerbuildx_windows
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           Write-Host "Installing Docker Buildx plugin..."
 
-          $version = "${{ env.WINDOWS_BUILDX_VERSION }}"
+          $version = (gh release view --repo docker/buildx --json tagName --jq .tagName).Trim()
+          if (-not $version) {
+            throw "Unable to resolve latest Docker Buildx release"
+          }
           Write-Host "Docker Buildx version: $version"
 
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -593,7 +601,7 @@ jobs:
         if: matrix.id == 'windows-amd64'
         uses: docker/setup-buildx-action@v4
         with:
-          version: ${{ steps.dockerbuildx_windows.outputs.version || env.WINDOWS_BUILDX_VERSION }}
+          version: ${{ steps.dockerbuildx_windows.outputs.version }}
           driver: ${{ matrix.id == 'windows-amd64' && 'remote' || 'docker-container' }}
           endpoint: ${{ matrix.id == 'windows-amd64' && 'npipe:////./pipe/buildkitd' || '' }}
       - name: Build and push container image
