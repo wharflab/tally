@@ -195,6 +195,13 @@ func (mr *MockRegistry) WriteRegistriesConf(dir string, registries ...string) (s
 	}
 	defer func() { _ = f.Close() }()
 
+	if _, err := fmt.Fprintln(f, `unqualified-search-registries = ["docker.io"]`); err != nil {
+		return "", err
+	}
+	if _, err := fmt.Fprintln(f); err != nil {
+		return "", err
+	}
+
 	for _, reg := range registries {
 		if _, err := fmt.Fprintf(f, "[[registry]]\nprefix = %q\nlocation = %q\ninsecure = true\n\n", reg, mr.Host()); err != nil {
 			return "", err

@@ -486,6 +486,10 @@ func finalizeMockRegistry(confPath string) error {
 		mockRegistry.Close()
 		return fmt.Errorf("set CONTAINERS_REGISTRIES_CONF: %w", err)
 	}
+	if err := os.Setenv("REGISTRIES_CONFIG_PATH", confPath); err != nil {
+		mockRegistry.Close()
+		return fmt.Errorf("set REGISTRIES_CONFIG_PATH: %w", err)
+	}
 	// Set default platform to match the mock registry's image platform (linux/arm64).
 	if err := os.Setenv("DOCKER_DEFAULT_PLATFORM", "linux/arm64"); err != nil {
 		mockRegistry.Close()

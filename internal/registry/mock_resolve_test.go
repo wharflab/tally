@@ -209,3 +209,49 @@ func TestContainersResolver_MockRegistry_RegistriesConf(t *testing.T) {
 		t.Errorf("expected mock to receive manifest request, got: %v", mr.Requests())
 	}
 }
+
+func TestContainersResolver_NewResolverUsesEnvRegistriesConf(t *testing.T) {
+	mr := testutil.New()
+	defer mr.Close()
+
+	_, err := mr.AddImage(testutil.ImageOpts{
+		Repo: "library/alpine",
+		Tag:  "3.19",
+		OS:   "linux",
+		Arch: "amd64",
+		Env:  map[string]string{"PATH": "/bin"},
+	})
+	if err != nil {
+		t.Fatalf("AddImage: %v", err)
+	}
+
+	confPath, err := mr.WriteRegistriesConf(t.TempDir(), "docker.io")
+	if err != nil {
+		t.Fatalf("WriteRegistriesConf: %v", err)
+	}
+	t.Setenv("CONTAINERS_REGISTRIES_CONF", confPath)
+	t.Setenv("REGISTRIES_CONFIG_PATH", "")
+
+	resolver := NewContainersResolver()
+	if resolver.sysCtx.SystemRegistriesConfPath != confPath {
+		t.Fatalf("SystemRegistriesConfPath = %q, want %q", resolver.sysCtx.SystemRegistriesConfPath, confPath)
+	}
+	if resolver.sysCtx.SystemRegistriesConfDirPath == "" {
+		t.Fatal("SystemRegistriesConfDirPath is empty; env config should be isolated from ambient drop-ins")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	mr.ResetRequests()
+	cfg, err := resolver.ResolveConfig(ctx, "alpine:3.19", "linux/amd64")
+	if err != nil {
+		t.Fatalf("ResolveConfig via env registries.conf: %v", err)
+	}
+	if cfg.OS != "linux" || cfg.Arch != "amd64" {
+		t.Errorf("platform = %s/%s, want linux/amd64", cfg.OS, cfg.Arch)
+	}
+	if !mr.HasRequest("/v2/library/alpine/manifests/3.19") {
+		t.Errorf("expected mock to receive manifest request, got: %v", mr.Requests())
+	}
+}

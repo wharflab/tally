@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/distribution/registry/api/errcode"
@@ -45,7 +47,17 @@ func NewContainersResolver() *ContainersResolver {
 	// Apply environment variable overrides for registries.conf discovery.
 	// Error is ignored: env var overrides are optional and missing vars are not fatal.
 	_ = environment.UpdateRegistriesConf(sysCtx) //nolint:errcheck // optional env var override; non-fatal
+	if sysCtx.SystemRegistriesConfPath != "" && sysCtx.SystemRegistriesConfDirPath == "" {
+		// An explicit registries.conf should be deterministic; otherwise
+		// host-level registries.conf.d drop-ins can rewrite short-name aliases
+		// differently on CI runners than on developer machines.
+		sysCtx.SystemRegistriesConfDirPath = isolatedRegistriesConfDirPath()
+	}
 	return &ContainersResolver{sysCtx: sysCtx, blobCache: memory.New()}
+}
+
+func isolatedRegistriesConfDirPath() string {
+	return filepath.Join(os.TempDir(), fmt.Sprintf("tally-no-registries-conf.d-%d", os.Getpid()))
 }
 
 // NewContainersResolverWithContext creates a resolver with a custom system context.
@@ -243,8 +255,8 @@ func formatPlatform(p *imgspecv1.Platform) string {
 	return formatPlatformParts(p.OS, p.Architecture, p.Variant)
 }
 
-func formatPlatformParts(os, arch, variant string) string {
-	s := os + "/" + arch
+func formatPlatformParts(osName, arch, variant string) string {
+	s := osName + "/" + arch
 	if variant != "" {
 		s += "/" + variant
 	}
