@@ -28,6 +28,10 @@ jobs:
           external-cache: true
           repository-cache: true
           cache-save: ${{ github.event_name != 'pull_request' }}
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
       - name: Build smoke artifacts
         run: |
           bazel build --config=release //_integrations/vscode-tally:extension_bundle

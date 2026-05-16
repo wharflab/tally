@@ -128,7 +128,7 @@ func mustBuildkitModuleDir(t *testing.T) string {
 		if _, err := os.Stat(rulesetPath); err != nil {
 			t.Fatalf("resolve Bazel BuildKit ruleset source: %v", err)
 		}
-		return filepath.Clean(filepath.Join(filepath.Dir(rulesetPath), "..", "..", ".."))
+		return buildkitModuleDirFromRulesetPath(rulesetPath)
 	}
 
 	goBinary := "go"
@@ -157,6 +157,20 @@ func mustBuildkitModuleDir(t *testing.T) string {
 		t.Fatal("empty buildkit module dir from go list")
 	}
 	return dir
+}
+
+func TestBuildkitModuleDirFromRulesetPath(t *testing.T) {
+	t.Parallel()
+
+	rulesetPath := filepath.Join("repo", "frontend", "dockerfile", "linter", "ruleset.go")
+	got := buildkitModuleDirFromRulesetPath(rulesetPath)
+	if got != "repo" {
+		t.Fatalf("module dir mismatch: %q", got)
+	}
+}
+
+func buildkitModuleDirFromRulesetPath(rulesetPath string) string {
+	return filepath.Clean(filepath.Join(filepath.Dir(rulesetPath), "..", "..", ".."))
 }
 
 func nearestGoModuleDir() string {
