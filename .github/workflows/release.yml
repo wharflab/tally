@@ -1343,11 +1343,11 @@ jobs:
         with:
           name: pypi-dists
           path: packaging/pypi/dist/
-      - name: Publish to TestPyPI
+      - name: Validate PyPI publish
         if: github.event_name == 'pull_request'
         run: |
           cd packaging/pypi
-          uv publish --publish-url "${PYPI_PUBLISH_URL}"
+          uv publish --dry-run --publish-url "${PYPI_PUBLISH_URL}"
       - name: Publish to PyPI
         if: github.event_name != 'pull_request'
         run: |
