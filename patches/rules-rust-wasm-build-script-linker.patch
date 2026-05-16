@@ -2,7 +2,7 @@ diff --git a/cargo/private/cargo_build_script.bzl b/cargo/private/cargo_build_sc
 index 0000000000..0000000000 100644
 --- a/cargo/private/cargo_build_script.bzl
 +++ b/cargo/private/cargo_build_script.bzl
-@@ -448,11 +448,17 @@ def _cargo_build_script_impl(ctx):
+@@ -448,12 +448,20 @@ def _cargo_build_script_impl(ctx):
  
      # Pull in env vars which may be required for the cc_toolchain to work (e.g. on OSX, the SDK version).
      # We hope that the linker env is sufficient for the whole cc_toolchain.
@@ -11,6 +11,8 @@ index 0000000000..0000000000 100644
 -    env.update(**linker_env)
 -    env["LD"] = linker
 -    env["LDFLAGS"] = " ".join(_pwd_flags(link_args))
++    cc_toolchain = None
++    feature_configuration = None
 +    if toolchain.target_arch in ("wasm32", "wasm64"):
 +        # Rust's built-in wasm linker path is used by rustc actions; wasm
 +        # toolchains from rules_rs do not provide an external linker File.
