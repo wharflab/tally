@@ -1024,6 +1024,7 @@ jobs:
           TAG="v${VERSION#v}"
           gh release upload "$TAG" "${{ steps.intellij_zip.outputs.zip_path }}" --clobber
   publish-intellij-marketplace:
+    if: github.event_name != 'pull_request'
     needs: build-intellij-plugin
     runs-on: ubuntu-latest
     env:
@@ -1123,6 +1124,19 @@ jobs:
           if [ -s "${RESPONSE_FILE}" ]; then
             cat "${RESPONSE_FILE}"
           fi
+  explain-intellij-pr-dry-run:
+    if: github.event_name == 'pull_request'
+    needs: build-intellij-plugin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain IntelliJ Marketplace dry-run behavior
+        run: |
+          {
+            echo "JetBrains Marketplace publish is intentionally skipped on pull_request dry-runs."
+            echo
+            echo "Reason: JetBrains Marketplace uploads are side-effecting; this workflow has already built,"
+            echo "smoke-checked, and uploaded the IntelliJ plugin artifact that would be published on a release."
+          } >> "$GITHUB_STEP_SUMMARY"
   publish-vscode-marketplace:
     if: github.event_name != 'pull_request'
     needs: build-vscode-vsix
