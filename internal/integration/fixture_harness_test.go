@@ -70,6 +70,7 @@ func runLintFixture(t *testing.T, dir string) {
 	t.Helper()
 
 	dockerfilePath := fixtureBuildFile(dir)
+	snapshotDir := fixtureSnapshotDir(t, dir)
 	outputFormat := lintFixtureOutputFormat(t, dir)
 	args := []string{"lint"}
 	if outputFormat == "" {
@@ -81,7 +82,7 @@ func runLintFixture(t *testing.T, dir string) {
 	}
 	args = append(args, dockerfilePath)
 	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = &stdoutBuf
@@ -92,19 +93,22 @@ func runLintFixture(t *testing.T, dir string) {
 		t.Fatalf("unexpected exit code %d\nstdout:\n%s\nstderr:\n%s", exitCode, stdoutBuf.String(), stderrBuf.String())
 	}
 	got := normalizeFixtureOutput(t, stdoutBuf.String())
+	if outputFormat == "sarif" {
+		got = normalizeBazelSARIFToolVersion(got)
+	}
 	if outputFormat == "json" || outputFormat == "sarif" {
 		opts := []func(*snaps.Config){
-			snaps.Dir(dir),
+			snaps.Dir(snapshotDir),
 			snaps.Filename("result"),
 			snaps.JSON(snaps.JSONConfig{Indent: "  ", SortKeys: true}),
 		}
 		if outputFormat == "sarif" {
 			opts = append(opts, snaps.Ext(".sarif"))
 		}
-		snaps.WithConfig(opts...).MatchStandaloneJSON(t, got)
+		integrationSnapshotConfig(opts...).MatchStandaloneJSON(t, got)
 	} else {
-		snaps.WithConfig(
-			snaps.Dir(dir),
+		integrationSnapshotConfig(
+			snaps.Dir(snapshotDir),
 			snaps.Filename("result"),
 			snaps.Ext(lintFixtureSnapshotExt(outputFormat)),
 		).MatchStandaloneSnapshot(t, got)
@@ -112,8 +116,8 @@ func runLintFixture(t *testing.T, dir string) {
 
 	if stderrBuf.Len() > 0 || fixtureSnapshotExists(t, dir, "stderr", ".txt") {
 		gotStderr := normalizeFixtureOutput(t, stderrBuf.String())
-		snaps.WithConfig(
-			snaps.Dir(dir),
+		integrationSnapshotConfig(
+			snaps.Dir(snapshotDir),
 			snaps.Filename("stderr"),
 			snaps.Ext(".txt"),
 			snaps.Raw(),
@@ -129,6 +133,7 @@ func runFixFixture(t *testing.T, dir string) {
 	t.Helper()
 
 	buildFile := fixtureBuildFile(dir)
+	snapshotDir := fixtureSnapshotDir(t, dir)
 	input := readFixtureFile(t, buildFile)
 	args := []string{"lint", "--format", "markdown", "--fix"}
 	if fixtureHasContextFiles(t, dir) {
@@ -140,7 +145,7 @@ func runFixFixture(t *testing.T, dir string) {
 	args = append(args, "-")
 	cmd := exec.Command(binaryPath, args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 	cmd.Stdin = strings.NewReader(input)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -154,8 +159,8 @@ func runFixFixture(t *testing.T, dir string) {
 	}
 
 	gotFixed := normalizeFixtureOutput(t, stdoutBuf.String())
-	snaps.WithConfig(
-		snaps.Dir(dir),
+	integrationSnapshotConfig(
+		snaps.Dir(snapshotDir),
 		snaps.Filename("fixed"),
 		snaps.Ext("."+filepath.Base(buildFile)),
 		snaps.Raw(),
@@ -165,8 +170,8 @@ func runFixFixture(t *testing.T, dir string) {
 		return
 	}
 	gotReport := normalizeFixtureOutput(t, stderrBuf.String())
-	snaps.WithConfig(
-		snaps.Dir(dir),
+	integrationSnapshotConfig(
+		snaps.Dir(snapshotDir),
 		snaps.Filename("report"),
 		snaps.Ext(".md"),
 		snaps.Raw(),
@@ -194,6 +199,10 @@ func normalizeFixtureOutput(t *testing.T, output string) string {
 		output = strings.ReplaceAll(output, filepath.ToSlash(wd)+"/", "")
 	}
 	return buildkitVersionRE.ReplaceAllString(output, "${1}0.0.0")
+}
+
+func normalizeBazelSARIFToolVersion(output string) string {
+	return bazelDevToolVersionRE.ReplaceAllString(output, "${1}dev (buildkit v0.0.0)${2}")
 }
 
 func readFixtureFile(t *testing.T, path string) string {
@@ -300,4 +309,13 @@ func fixtureSnapshotExists(t *testing.T, dir, filename, ext string) bool {
 		t.Fatalf("glob fixture snapshots: %v", err)
 	}
 	return len(matches) > 0
+}
+
+func fixtureSnapshotDir(t *testing.T, dir string) string {
+	t.Helper()
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		t.Fatalf("resolve fixture snapshot dir %s: %v", dir, err)
+	}
+	return abs
 }

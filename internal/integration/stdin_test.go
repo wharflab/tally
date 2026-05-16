@@ -43,7 +43,7 @@ func testStdinLintJSON(t *testing.T) {
 		t.Errorf("expected <stdin> in output, got: %s", stdout)
 	}
 
-	snaps.WithConfig(
+	integrationSnapshotConfig(
 		snaps.JSON(snaps.JSONConfig{SortKeys: true, Indent: "  "}),
 	).MatchStandaloneJSON(t, stdout)
 }
@@ -70,7 +70,7 @@ func testStdinLintText(t *testing.T) {
 		t.Errorf("expected <stdin> in output, got: %s", stdout)
 	}
 
-	snaps.WithConfig(snaps.Ext(".txt")).MatchStandaloneSnapshot(t, stdout)
+	integrationSnapshotConfig(snaps.Ext(".txt")).MatchStandaloneSnapshot(t, stdout)
 }
 
 // testStdinFixOutputsToStdout verifies that --fix with stdin writes the fixed
@@ -111,7 +111,7 @@ func testStdinFixOutputsToStdout(t *testing.T) {
 	}
 
 	// Snapshot the fixed output.
-	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, stdout)
+	integrationSnapshotConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, stdout)
 }
 
 // testStdinFixNoChanges verifies that --fix with stdin echoes back the original

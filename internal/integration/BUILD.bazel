@@ -14,6 +14,7 @@ go_test(
         "ai_autofix_dl4001_test.go",
         "benchmark_test.go",
         "docker_plugin_test.go",
+        "env_test.go",
         "error_test.go",
         "fix_cases_test.go",
         "fix_test.go",
@@ -24,6 +25,7 @@ go_test(
         "lint_test.go",
         "main_test.go",
         "orchestrator_test.go",
+        "snapshots_test.go",
         "stdin_test.go",
         "version_test.go",
     ],
@@ -38,6 +40,10 @@ go_test(
     env = {
         "TALLY_ACP_AGENT_BINARY": "$(rlocationpath //internal/ai/acp/testdata/testagent)",
         "TALLY_INTEGRATION_BINARY": "$(rlocationpath //:tally)",
+        # go-snaps creates missing snapshots by default. Bazel tests run against
+        # a writable materialized workspace, so keep local Bazel runs strict
+        # instead of creating sandbox-only snapshots.
+        "INTEGRATION_STRICT_SNAPSHOTS": "true",
     },
     deps = [
         "//internal/ai/autofixdata:go_default_library",

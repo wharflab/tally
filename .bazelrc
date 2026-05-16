@@ -27,9 +27,10 @@ build:release --embed_label=0.0.0-dev
 build:release --compilation_mode=opt
 build:release --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
 
-# Go test jobs use the full feature set too, so registry-backed rules are not
-# silently dropped under Bazel.
-test:go --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
+# Go build/test jobs use the full feature set too, so registry-backed rules are
+# not silently dropped under Bazel. This is a build config because integration
+# tests depend on the //:tally binary as data.
+build:go --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
 
 # Preserve the previous `go test -race` behavior for Makefile and CI test jobs.
 test:race --@rules_go//go/config:race

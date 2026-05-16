@@ -89,7 +89,7 @@ target "worker" {
 
 		var stderr bytes.Buffer
 		cmd := exec.Command(binaryPath, "lint", "--fix", filepath.Join(dir, "compose.yaml"))
-		cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+		cmd.Env = integrationCommandEnv()
 		cmd.Stderr = &stderr
 		err := cmd.Run()
 		var exitErr *exec.ExitError
@@ -124,7 +124,7 @@ func runOrchestratorLint(t *testing.T, entrypoint string) orchestratorJSONOutput
 		entrypoint,
 	}
 	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
