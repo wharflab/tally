@@ -27,11 +27,10 @@ jobs:
           external-cache: true
           repository-cache: true
           cache-save: ${{ github.event_name != 'pull_request' }}
-      - name: Build benchmark binaries
+      - name: Build benchmark prerequisites
         id: benchmark-binaries
         run: |
           bazel build --config=release //:tally //internal/ai/acp/testdata/testagent
-          echo "tally=$(pwd)/$(tools/bazel/target_output.sh --config=release //:tally)" >> "$GITHUB_OUTPUT"
           echo "acp_agent=$(pwd)/$(tools/bazel/target_output.sh --config=release //internal/ai/acp/testdata/testagent)" >> "$GITHUB_OUTPUT"
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
@@ -41,4 +40,3 @@ jobs:
           run: go test -bench=. ./internal/integration
         env:
           TALLY_ACP_AGENT_BINARY: ${{ steps.benchmark-binaries.outputs.acp_agent }}
-          TALLY_INTEGRATION_BINARY: ${{ steps.benchmark-binaries.outputs.tally }}

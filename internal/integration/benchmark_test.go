@@ -25,13 +25,16 @@ func ensureBinary(b *testing.B) {
 	if benchBinaryPath != "" {
 		return
 	}
-	if binaryPath != "" {
+	if binaryPath != "" && (os.Getenv("TALLY_INTEGRATION_BINARY") != "" || os.Getenv("TEST_SRCDIR") != "") {
 		benchBinaryPath = binaryPath
 		return
 	}
 
 	// Build the binary (this happens when running benchmarks without tests)
-	tmpDir := b.TempDir()
+	tmpDir, err := os.MkdirTemp("", "tally-bench")
+	if err != nil {
+		b.Fatalf("failed to create benchmark binary directory: %v", err)
+	}
 
 	binaryName := "tally"
 	if runtime.GOOS == "windows" {
