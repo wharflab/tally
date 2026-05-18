@@ -141,6 +141,7 @@
               "rules/tally/labels/no-duplicate-keys",
               "rules/tally/labels/no-buildx-git-overlap",
               "rules/tally/labels/no-stale-base-digest",
+              "rules/tally/labels/prefer-grouped",
               "rules/tally/labels/valid-key"
             ]
           },

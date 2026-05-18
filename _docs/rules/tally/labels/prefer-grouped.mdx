@@ -1,0 +1,95 @@
+---
+title: "tally/labels/prefer-grouped"
+description: "Combine adjacent LABEL instructions in the same stage into one multi-line LABEL block."
+---
+
+Adjacent `LABEL` instructions in the same stage are easier to review when they
+are written as a single multi-line `LABEL` block.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Style |
+| Default | Enabled |
+| Auto-fix | Yes |
+
+## Description
+
+Modern Docker no longer needs separate `LABEL` instructions to keep image
+layers small, so scattered LABELs serve no build purpose. Grouping them into
+one multi-line block keeps related image metadata together, makes diffs easier
+to read, and reduces the chance that two unrelated edits land on different
+lines of the same logical metadata block.
+
+The rule reports when a stage has at least `min-labels` label key/value pairs
+spread across two or more adjacent `LABEL` instructions. Two `LABEL`
+instructions are considered adjacent only when no other Dockerfile
+instruction (such as `ARG`, `ENV`, or `RUN`) and no comment line appears
+between them. Comments are treated as deliberate section breaks and never
+crossed by the auto-fix.
+
+This rule does not reorder labels. Stable ordering is left to a separate rule.
+
+## Auto-fix
+
+The fix replaces the first `LABEL` instruction in the run with one multi-line
+`LABEL` containing every pair from the run, and deletes the remaining `LABEL`
+instructions in the run. Pairs are emitted in source order so that Docker's
+"last value wins" rule still produces the same effective image label map.
+
+The fix is suppressed when:
+
+- a key in the run is dynamic (for example `LABEL "$PREFIX.name"=...`)
+- a pair uses the legacy `LABEL key value` form
+- the run contains a duplicate key (let
+  [`tally/labels/no-duplicate-keys`](/rules/tally/labels/no-duplicate-keys) rewrite the
+  duplicate first)
+
+The fix output uses the same shape that
+[`tally/newline-per-chained-call`](/rules/tally/newline-per-chained-call) produces
+for split LABELs, so the two rules agree on a single canonical form and a
+re-lint after fixing is clean.
+
+## Examples
+
+### Bad
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL org.opencontainers.image.title="demo"
+LABEL org.opencontainers.image.description="example image"
+LABEL org.opencontainers.image.source="https://github.com/example/demo"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+```
+
+### Good
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL org.opencontainers.image.title="demo" \
+      org.opencontainers.image.description="example image" \
+      org.opencontainers.image.source="https://github.com/example/demo" \
+      org.opencontainers.image.licenses="Apache-2.0"
+```
+
+## Configuration
+
+```toml
+[rules.tally.labels.prefer-grouped]
+severity = "info"
+min-labels = 3
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `min-labels` | integer (>= 2) | `3` | Minimum total label key/value pairs across an adjacent run before the rule reports. |
+
+## Related Rules
+
+- [`tally/labels/no-duplicate-keys`](/rules/tally/labels/no-duplicate-keys) — runs first when a duplicate key would otherwise be merged.
+- [`tally/newline-per-chained-call`](/rules/tally/newline-per-chained-call) — splits multi-pair `LABEL` instructions onto separate continuation lines; together with this rule it produces a canonical multi-line LABEL shape.
+- [`tally/labels/no-buildx-git-overlap`](/rules/tally/labels/no-buildx-git-overlap)
+- [`tally/labels/no-stale-base-digest`](/rules/tally/labels/no-stale-base-digest)
+- [`tally/labels/valid-key`](/rules/tally/labels/valid-key)
