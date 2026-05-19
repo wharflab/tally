@@ -4,6 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
+	"github.com/wharflab/tally/internal/facts"
 	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
@@ -24,6 +27,147 @@ func TestPreferGroupedRule_Metadata(t *testing.T) {
 	}
 	if meta.FixPriority != 96 {
 		t.Fatalf("FixPriority = %d, want 96 (just before newline-per-chained-call)", meta.FixPriority)
+	}
+}
+
+func TestPreferGroupedRule_Schema(t *testing.T) {
+	t.Parallel()
+
+	schema := NewPreferGroupedRule().Schema()
+	if schema == nil {
+		t.Fatal("Schema() returned nil")
+	}
+	if _, ok := schema["properties"]; !ok {
+		t.Errorf("Schema is missing JSON Schema properties field; got %v", schema)
+	}
+}
+
+func TestPreferGroupedRule_CheckHandlesNilFacts(t *testing.T) {
+	t.Parallel()
+
+	if got := NewPreferGroupedRule().Check(rules.LintInput{}); got != nil {
+		t.Errorf("Check with nil Facts returned %v, want nil", got)
+	}
+}
+
+func TestPreferGroupedFixSafe(t *testing.T) {
+	t.Parallel()
+
+	stub := &instructions.LabelCommand{}
+
+	for _, tc := range []struct {
+		name string
+		pair facts.LabelPairFact
+		want bool
+	}{
+		{
+			name: "valid pair",
+			pair: facts.LabelPairFact{Key: "ok", Value: "v"},
+			want: true,
+		},
+		{
+			name: "no-delim legacy form",
+			pair: facts.LabelPairFact{Key: "k", Value: "v", NoDelim: true},
+			want: false,
+		},
+		{
+			name: "dynamic key",
+			pair: facts.LabelPairFact{Key: "k", Value: "v", KeyIsDynamic: true},
+			want: false,
+		},
+		{
+			name: "expansion error",
+			pair: facts.LabelPairFact{Key: "k", Value: "v", ExpansionError: "bad"},
+			want: false,
+		},
+		{
+			name: "empty key",
+			pair: facts.LabelPairFact{Key: "", Value: "v"},
+			want: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			run := []facts.LabelInstructionFact{
+				{Command: stub, Pairs: []facts.LabelPairFact{tc.pair}},
+			}
+			if got := preferGroupedFixSafe(run); got != tc.want {
+				t.Errorf("preferGroupedFixSafe(%s) = %v, want %v", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPreferGroupedFixSafe_NilCommandRejected(t *testing.T) {
+	t.Parallel()
+
+	run := []facts.LabelInstructionFact{{Command: nil}}
+	if got := preferGroupedFixSafe(run); got {
+		t.Error("expected fix to be rejected when Command is nil")
+	}
+}
+
+func TestPreferGroupedFixSafe_DuplicateKeyAcrossInstructions(t *testing.T) {
+	t.Parallel()
+
+	stub := &instructions.LabelCommand{}
+	run := []facts.LabelInstructionFact{
+		{Command: stub, Pairs: []facts.LabelPairFact{{Key: "x", Value: "1"}}},
+		{Command: stub, Pairs: []facts.LabelPairFact{{Key: "x", Value: "2"}}},
+	}
+	if got := preferGroupedFixSafe(run); got {
+		t.Error("expected fix to be rejected when a key repeats across LABELs")
+	}
+}
+
+func TestRenderMergedLabel_FallsBackToBackslash(t *testing.T) {
+	t.Parallel()
+
+	// escapeToken == 0 should default to backslash.
+	got := renderMergedLabel(nil, "", 0)
+	if got != "" {
+		t.Errorf("renderMergedLabel(empty run) = %q, want empty string", got)
+	}
+}
+
+func TestLabelInstructionsAdjacent_DefensiveBranches(t *testing.T) {
+	t.Parallel()
+
+	a := facts.LabelInstructionFact{StageIndex: 0, CommandIndex: 1}
+	b := facts.LabelInstructionFact{StageIndex: 1, CommandIndex: 2}
+	if labelInstructionsAdjacent(a, b, nil) {
+		t.Error("different stages must not be adjacent")
+	}
+
+	a = facts.LabelInstructionFact{StageIndex: 0, CommandIndex: 1}
+	b = facts.LabelInstructionFact{StageIndex: 0, CommandIndex: 5}
+	if labelInstructionsAdjacent(a, b, nil) {
+		t.Error("non-consecutive command indices must not be adjacent")
+	}
+
+	a = facts.LabelInstructionFact{StageIndex: 0, CommandIndex: 1}
+	b = facts.LabelInstructionFact{StageIndex: 0, CommandIndex: 2}
+	if labelInstructionsAdjacent(a, b, nil) {
+		t.Error("missing Location ranges must not be adjacent")
+	}
+}
+
+func TestBuildPreferGroupedFix_DefensiveBranches(t *testing.T) {
+	t.Parallel()
+
+	meta := NewPreferGroupedRule().Metadata()
+
+	if got := buildPreferGroupedFix("Dockerfile", nil, nil, '\\', meta); got != nil {
+		t.Error("expected nil fix when SourceMap is nil")
+	}
+
+	stub := &instructions.LabelCommand{}
+	short := []facts.LabelInstructionFact{
+		{Command: stub, Pairs: []facts.LabelPairFact{{Key: "k", Value: "v"}}},
+	}
+	if got := buildPreferGroupedFix("Dockerfile", nil, short, '\\', meta); got != nil {
+		t.Error("expected nil fix when run has fewer than 2 LABELs")
 	}
 }
 
