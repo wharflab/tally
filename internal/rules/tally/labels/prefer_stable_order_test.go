@@ -599,16 +599,19 @@ func TestInterSpanGapsAreClean_RejectsCommentLine(t *testing.T) {
 	t.Parallel()
 
 	// A LABEL with a comment between continuation lines is not safely
-	// reorderable. We synthesize a rule input via testutil and verify the rule
-	// reports without emitting a fix.
+	// reorderable. Verify the rule reports but does not emit an auto-fix.
 	content := `FROM alpine:3.20
 LABEL org.opencontainers.image.description="d" \
+      # keep this comment
       org.opencontainers.image.title="t"
 `
 	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	violations := NewPreferStableOrderRule().Check(input)
-	if len(violations) != 1 || violations[0].PreferredFix() == nil {
-		t.Fatalf("baseline case should have a fix")
+	if len(violations) != 1 {
+		t.Fatalf("expected one violation, got %d", len(violations))
+	}
+	if got := violations[0].PreferredFix(); got != nil {
+		t.Fatalf("expected no fix when comment splits LABEL pairs, got %+v", got)
 	}
 }
 
