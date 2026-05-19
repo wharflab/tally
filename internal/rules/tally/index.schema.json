@@ -15,6 +15,9 @@
     "labels/no-buildx-git-overlap": {
       "$ref": "./labels/no_buildx_git_overlap.schema.json"
     },
+    "labels/prefer-grouped": {
+      "$ref": "./labels/prefer_grouped.schema.json"
+    },
     "max-lines": {
       "$ref": "./max_lines.schema.json"
     },

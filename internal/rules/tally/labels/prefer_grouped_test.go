@@ -123,16 +123,31 @@ LABEL org.opencontainers.image.source="https://example.com"
 			WantViolations: 0,
 		},
 		{
+			Name: "blank line between LABELs breaks the run",
+			Content: `FROM alpine:3.20
+LABEL org.opencontainers.image.title="demo"
+LABEL org.opencontainers.image.description="desc"
+
+LABEL org.opencontainers.image.source="https://example.com"
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "LABELs in different stages are independent",
+			// Each stage has 3 labels (the default min-labels threshold), so
+			// the cross-stage run of 6 pairs would trigger one violation if
+			// stage isolation were broken; per-stage runs of 3 do not.
 			Content: `FROM alpine:3.20 AS build
 LABEL stage.a="1"
 LABEL stage.b="2"
+LABEL stage.c="3"
 
 FROM alpine:3.20
 LABEL final.a="1"
 LABEL final.b="2"
+LABEL final.c="3"
 `,
-			WantViolations: 0,
+			WantViolations: 2,
 		},
 		{
 			Name: "run with dynamic key still reports but no fix",
@@ -281,6 +296,38 @@ LABEL org.opencontainers.image.source="https://example.com"
 	}
 	if got := violations[0].PreferredFix(); got != nil {
 		t.Errorf("expected no fix for dynamic-key run, got %+v", got)
+	}
+}
+
+func TestPreferGroupedRule_FixHonorsBacktickEscape(t *testing.T) {
+	t.Parallel()
+
+	// Windows-style Dockerfile that opts into the backtick escape token. The
+	// merged LABEL must use backticks (not backslashes) for line continuations,
+	// otherwise BuildKit would parse the literal `\` as part of the value.
+	content := "# escape=`\n" +
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+		"LABEL org.opencontainers.image.title=\"demo\"\n" +
+		"LABEL org.opencontainers.image.description=\"desc\"\n" +
+		"LABEL org.opencontainers.image.source=\"https://example.com\"\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+
+	violations := NewPreferGroupedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fixpkg.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := "# escape=`\n" +
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+		"LABEL org.opencontainers.image.title=\"demo\" `\n" +
+		"\torg.opencontainers.image.description=\"desc\" `\n" +
+		"\torg.opencontainers.image.source=\"https://example.com\"\n"
+	if got != want {
+		t.Errorf("merge fix mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+	if strings.Contains(got, " \\\n") {
+		t.Errorf("merged output must not contain backslash continuations under # escape=`")
 	}
 }
 

@@ -96,7 +96,9 @@ func (r *PreferGroupedRule) Check(input rules.LintInput) []rules.Violation {
 
 	var violations []rules.Violation
 	for _, stage := range input.Facts.Stages() {
-		if stage == nil {
+		if stage == nil || len(stage.LabelInstructions) < 2 {
+			// A run requires at least two adjacent LABELs; skip stages that
+			// can't possibly produce one before paying the source-map cost.
 			continue
 		}
 		for _, run := range adjacentLabelRuns(stage, sm) {
@@ -113,9 +115,12 @@ func (r *PreferGroupedRule) Check(input rules.LintInput) []rules.Violation {
 				"%d adjacent LABEL instructions in this stage carry %d label pairs; combine them into one multi-line LABEL",
 				len(run), totalPairs,
 			)
+			detail := "Grouping LABEL pairs into one multi-line block keeps " +
+				"related image metadata together for review and avoids " +
+				"unrelated edits drifting between separate LABEL instructions."
 			violation := rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).
 				WithDocURL(meta.DocURL).
-				WithDetail("Grouping LABEL pairs into one multi-line block keeps related image metadata together for review and avoids unrelated edits drifting between separate LABEL instructions.")
+				WithDetail(detail)
 
 			if fix := buildPreferGroupedFix(input.File, sm, run, escapeToken, meta); fix != nil {
 				violation = violation.WithSuggestedFix(fix)
@@ -158,8 +163,9 @@ func adjacentLabelRuns(stage *facts.StageFacts, sm *sourcemap.SourceMap) [][]fac
 }
 
 // labelInstructionsAdjacent reports whether b immediately follows a within the
-// same stage with no intervening non-LABEL command and no comment line in the
-// source between them.
+// same stage with no intervening non-LABEL command, comment line, or blank
+// line between them. Blank lines and comments both mark deliberate section
+// breaks, so the auto-fix never crosses them.
 func labelInstructionsAdjacent(a, b facts.LabelInstructionFact, sm *sourcemap.SourceMap) bool {
 	if a.StageIndex != b.StageIndex {
 		return false
@@ -180,6 +186,9 @@ func labelInstructionsAdjacent(a, b facts.LabelInstructionFact, sm *sourcemap.So
 	for line := prevEnd + 1; line < nextStart; line++ {
 		raw := sm.Line(line - 1)
 		trimmed := strings.TrimLeft(raw, " \t")
+		if trimmed == "" {
+			return false
+		}
 		if strings.HasPrefix(trimmed, "#") {
 			return false
 		}
@@ -223,7 +232,7 @@ func buildPreferGroupedFix(
 	}
 
 	indent := leadingHorizontalWhitespace(sm.Line(startLine - 1))
-	merged := renderMergedLabel(run, indent)
+	merged := renderMergedLabel(run, indent, escapeToken)
 	if merged == "" {
 		return nil
 	}
@@ -291,8 +300,17 @@ func preferGroupedFixSafe(run []facts.LabelInstructionFact) bool {
 // renderMergedLabel produces the source text for one multi-line LABEL
 // instruction containing every pair from run, in source order. The output
 // matches the shape that tally/newline-per-chained-call emits, so the splitter
-// recognises it as already-formatted on a co-running fix.
-func renderMergedLabel(run []facts.LabelInstructionFact, indent string) string {
+// recognises it as already-formatted on a co-running fix. The continuation
+// character respects the active Dockerfile escape token (defaults to a
+// backslash; switches to a backtick after a `# escape=` directive).
+func renderMergedLabel(
+	run []facts.LabelInstructionFact,
+	indent string,
+	escapeToken rune,
+) string {
+	if escapeToken == 0 {
+		escapeToken = '\\'
+	}
 	var b strings.Builder
 	first := true
 	for _, inst := range run {
@@ -307,7 +325,9 @@ func renderMergedLabel(run []facts.LabelInstructionFact, indent string) string {
 				first = false
 				continue
 			}
-			b.WriteString(" \\\n")
+			b.WriteByte(' ')
+			b.WriteRune(escapeToken)
+			b.WriteByte('\n')
 			b.WriteString(indent)
 			b.WriteByte('\t')
 			b.WriteString(kv.String())
