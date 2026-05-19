@@ -118,6 +118,11 @@
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally/labels"
     },
     {
+      "input": "internal/rules/tally/labels/prefer_stable_order.schema.json",
+      "output": "internal/schemas/generated/rules/tally/labels/prefer_stable_order.gen.go",
+      "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally/labels"
+    },
+    {
       "input": "internal/rules/hadolint/dl3001.schema.json",
       "output": "internal/schemas/generated/rules/hadolint/dl3001.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/hadolint"

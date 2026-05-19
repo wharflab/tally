@@ -389,6 +389,50 @@
       "title": "tally/labels/prefer-grouped rule config",
       "type": "object"
     },
+    "rule-tally-labels-prefer-stable-order": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/labels/prefer-stable-order rule.",
+      "examples": [
+        {
+          "order": "oci-logical"
+        },
+        {
+          "order": "lexical",
+          "severity": "info"
+        },
+        {
+          "order": "oci-logical",
+          "sort-unknown": true
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "order": {
+          "default": "oci-logical",
+          "description": "Comparator to use when checking key order. \"oci-logical\" groups OCI and ecosystem keys by purpose; \"lexical\" sorts purely alphabetically.",
+          "enum": [
+            "oci-logical",
+            "lexical"
+          ],
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        },
+        "sort-unknown": {
+          "default": false,
+          "description": "When true, custom reverse-DNS keys are clustered by namespace and sorted lexically within each namespace. When false, custom keys keep their relative source order.",
+          "type": "boolean"
+        }
+      },
+      "title": "tally/labels/prefer-stable-order rule config",
+      "type": "object"
+    },
     "rule-tally-max-lines": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/max-lines rule.",
@@ -1140,6 +1184,9 @@
         },
         "labels/prefer-grouped": {
           "$ref": "#/$defs/rule-tally-labels-prefer-grouped"
+        },
+        "labels/prefer-stable-order": {
+          "$ref": "#/$defs/rule-tally-labels-prefer-stable-order"
         },
         "max-lines": {
           "$ref": "#/$defs/rule-tally-max-lines"

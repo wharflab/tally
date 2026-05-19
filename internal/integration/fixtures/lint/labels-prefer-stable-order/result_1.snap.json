@@ -1,0 +1,87 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/labels-prefer-stable-order/Dockerfile",
+      "violations": [
+        {
+          "detail": "Reorder LABEL pairs into the OCI logical groups: identity (title, description); source/refs (source, url, documentation); ownership/legal (authors, vendor, licenses); release/provenance (version, revision, created, ref.name); base image (base.name, base.digest); ecosystem and legacy keys last. A stable key order keeps metadata diffs small and easy to review.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/labels/prefer-stable-order/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "fixtures/lint/labels-prefer-stable-order/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "label keys in this LABEL block are not in the configured stable order",
+          "rule": "tally/labels/prefer-stable-order",
+          "severity": "info",
+          "sourceCode": "LABEL org.opencontainers.image.description=\"example image\" \\",
+          "suggestedFix": {
+            "description": "Reorder 3 LABEL keys into stable order",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 58,
+                    "line": 8
+                  },
+                  "file": "fixtures/lint/labels-prefer-stable-order/Dockerfile",
+                  "start": {
+                    "column": 6,
+                    "line": 8
+                  }
+                },
+                "newText": "org.opencontainers.image.title=\"demo\""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 71,
+                    "line": 9
+                  },
+                  "file": "fixtures/lint/labels-prefer-stable-order/Dockerfile",
+                  "start": {
+                    "column": 6,
+                    "line": 9
+                  }
+                },
+                "newText": "org.opencontainers.image.description=\"example image\""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 43,
+                    "line": 10
+                  },
+                  "file": "fixtures/lint/labels-prefer-stable-order/Dockerfile",
+                  "start": {
+                    "column": 6,
+                    "line": 10
+                  }
+                },
+                "newText": "org.opencontainers.image.source=\"https://github.com/example/demo\""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 95
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}
