@@ -353,6 +353,42 @@
       "title": "tally/labels/no-buildx-git-overlap rule config",
       "type": "object"
     },
+    "rule-tally-labels-prefer-grouped": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/labels/prefer-grouped rule.",
+      "examples": [
+        {
+          "min-labels": 3
+        },
+        {
+          "min-labels": 5,
+          "severity": "info"
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "min-labels": {
+          "default": 3,
+          "description": "Minimum total label key/value pairs across an adjacent run of LABEL instructions before the rule reports.",
+          "examples": [
+            3,
+            5
+          ],
+          "minimum": 2,
+          "type": "integer"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/labels/prefer-grouped rule config",
+      "type": "object"
+    },
     "rule-tally-max-lines": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/max-lines rule.",
@@ -1101,6 +1137,9 @@
         },
         "labels/no-buildx-git-overlap": {
           "$ref": "#/$defs/rule-tally-labels-no-buildx-git-overlap"
+        },
+        "labels/prefer-grouped": {
+          "$ref": "#/$defs/rule-tally-labels-prefer-grouped"
         },
         "max-lines": {
           "$ref": "#/$defs/rule-tally-max-lines"

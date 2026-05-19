@@ -55,6 +55,10 @@ type IndexSchemaJson_4 struct {
 	// "labels/no-buildx-git-overlap".
 	LabelsNoBuildxGitOverlap *labels.NoBuildxGitOverlapSchemaJson `json:"labels/no-buildx-git-overlap,omitempty,omitzero"`
 
+	// LabelsPreferGrouped corresponds to the JSON schema field
+	// "labels/prefer-grouped".
+	LabelsPreferGrouped *labels.PreferGroupedSchemaJson `json:"labels/prefer-grouped,omitempty,omitzero"`
+
 	// MaxLines corresponds to the JSON schema field "max-lines".
 	MaxLines *tally.MaxLinesSchemaJson `json:"max-lines,omitempty,omitzero"`
 

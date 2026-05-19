@@ -1,0 +1,101 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/labels-prefer-grouped/Dockerfile",
+      "violations": [
+        {
+          "detail": "Grouping LABEL pairs into one multi-line block keeps related image metadata together for review and avoids unrelated edits drifting between separate LABEL instructions.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/labels/prefer-grouped/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/labels-prefer-grouped/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "4 adjacent LABEL instructions in this stage carry 4 label pairs; combine them into one multi-line LABEL",
+          "rule": "tally/labels/prefer-grouped",
+          "severity": "info",
+          "sourceCode": "LABEL org.opencontainers.image.title=\"demo\"",
+          "suggestedFix": {
+            "description": "Combine 4 adjacent LABEL instructions into one multi-line LABEL",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 43,
+                    "line": 2
+                  },
+                  "file": "fixtures/lint/labels-prefer-grouped/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 2
+                  }
+                },
+                "newText": "LABEL org.opencontainers.image.title=\"demo\" \\\n\torg.opencontainers.image.description=\"example image\" \\\n\torg.opencontainers.image.source=\"https://github.com/example/demo\" \\\n\torg.opencontainers.image.licenses=\"Apache-2.0\""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 4
+                  },
+                  "file": "fixtures/lint/labels-prefer-grouped/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 3
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 5
+                  },
+                  "file": "fixtures/lint/labels-prefer-grouped/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 4
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 6
+                  },
+                  "file": "fixtures/lint/labels-prefer-grouped/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 5
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 96
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

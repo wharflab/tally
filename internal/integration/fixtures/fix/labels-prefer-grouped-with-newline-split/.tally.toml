@@ -1,0 +1,9 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = [
+  "tally/labels/prefer-grouped",
+  "tally/newline-per-chained-call",
+]
+exclude = ["*"]

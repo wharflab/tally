@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/labels/prefer_grouped.schema.json",
+  "title": "tally/labels/prefer-grouped rule config",
+  "description": "Configuration options for the tally/labels/prefer-grouped rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../../rule-config.schema.json#/$defs/exclude" },
+    "min-labels": {
+      "type": "integer",
+      "minimum": 2,
+      "default": 3,
+      "description": "Minimum total label key/value pairs across an adjacent run of LABEL instructions before the rule reports.",
+      "examples": [3, 5]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "min-labels": 3 },
+    { "severity": "info", "min-labels": 5 }
+  ]
+}
