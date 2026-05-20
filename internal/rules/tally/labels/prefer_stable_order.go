@@ -232,7 +232,6 @@ const (
 	unknownReverseDNSGroupRank  = 9
 	unknownUnqualifiedGroupRank = 10
 	dockerExtensionPrefix       = "com.docker.extension."
-	dockerImageSourceEntrypoint = "com.docker.image.source.entrypoint"
 	labelSchemaPrefix           = "org.label-schema."
 	maintainerKey               = command.Maintainer
 	ioK8sDisplayName            = "io.k8s.display-name"
@@ -272,7 +271,7 @@ var ociKnownKeyRanks = func() map[string]struct {
 		ioOpenShiftTags:                   {openshiftCatalogGroupRank, 3},
 		ioOpenShiftExposeServices:         {openshiftCatalogGroupRank, 4},
 		ioOpenShiftS2IScriptsURL:          {openshiftCatalogGroupRank, 5},
-		dockerImageSourceEntrypoint:       {dockerEcosystemGroupRank, 1},
+		dockerfileSourceEntrypointLabel:   {dockerEcosystemGroupRank, 1},
 		maintainerKey:                     {legacyGroupRank, 100},
 	}
 	return m

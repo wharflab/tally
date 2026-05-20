@@ -407,7 +407,7 @@ func TestKeyRank_OCIGroups(t *testing.T) {
 		{ioOpenShiftTags, 6, 3},
 		{ioOpenShiftExposeServices, 6, 4},
 		{ioOpenShiftS2IScriptsURL, 6, 5},
-		{dockerImageSourceEntrypoint, 7, 1},
+		{dockerfileSourceEntrypointLabel, 7, 1},
 		{maintainerKey, 8, 100},
 	}
 	for _, c := range cases {
