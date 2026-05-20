@@ -14,7 +14,7 @@ require (
 	github.com/compose-spec/compose-go/v2 v2.10.2
 	github.com/containerd/platforms v1.0.0-rc.4
 	github.com/distribution/reference v0.6.0
-	github.com/docker/buildx v0.34.0
+	github.com/docker/buildx v0.34.1
 	github.com/docker/cli v29.5.1+incompatible
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/editorconfig/editorconfig-core-go/v2 v2.6.4
