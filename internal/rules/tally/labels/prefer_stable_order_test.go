@@ -193,6 +193,22 @@ LABEL com.example.zeta="z" \
 			WantViolations: 1,
 		},
 		{
+			Name: "all-unqualified unknown keys keep relative order (clean)",
+			Content: `FROM alpine:3.20
+LABEL flavor="spicy" \
+      team="alpha"
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "mixed unknown reverse-DNS and unqualified flagged when out of order",
+			Content: `FROM alpine:3.20
+LABEL flavor="spicy" \
+      com.example.key="x"
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "single-line multi-pair LABEL out of order: report only, no fix",
 			Content: `FROM alpine:3.20
 LABEL org.opencontainers.image.description="d" org.opencontainers.image.title="t"

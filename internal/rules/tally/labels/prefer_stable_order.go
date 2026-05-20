@@ -161,19 +161,11 @@ func (r *PreferStableOrderRule) evaluate(
 		ranks[i] = keyRank(p.Key, i, ctx.mode, ctx.sortUnknown)
 	}
 
-	if ctx.mode == preferStableOrderOCILogical && !ctx.sortUnknown {
-		allUnknown := true
-		for _, r := range ranks {
-			if r.groupRank < unknownReverseDNSGroupRank {
-				allUnknown = false
-				break
-			}
-		}
-		if allUnknown {
-			return rules.Violation{}, false
-		}
-	}
-
+	// A block of only group-9 (reverse-DNS) keys with sort-unknown=false, or
+	// only group-10 (unqualified) keys, sorts by originalIndex alone, so the
+	// permutation below is already identity and no violation fires. A *mixed*
+	// group-9 + group-10 block does have a deterministic ordering (9 before
+	// 10), and the rule reports it.
 	permutation := stableSortPermutation(ranks)
 	if isIdentityPermutation(permutation) {
 		return rules.Violation{}, false
