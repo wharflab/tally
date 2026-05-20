@@ -59,6 +59,10 @@ type IndexSchemaJson_4 struct {
 	// "labels/prefer-grouped".
 	LabelsPreferGrouped *labels.PreferGroupedSchemaJson `json:"labels/prefer-grouped,omitempty,omitzero"`
 
+	// LabelsPreferStableOrder corresponds to the JSON schema field
+	// "labels/prefer-stable-order".
+	LabelsPreferStableOrder *labels.PreferStableOrderSchemaJson `json:"labels/prefer-stable-order,omitempty,omitzero"`
+
 	// MaxLines corresponds to the JSON schema field "max-lines".
 	MaxLines *tally.MaxLinesSchemaJson `json:"max-lines,omitempty,omitzero"`
 

@@ -18,6 +18,9 @@
     "labels/prefer-grouped": {
       "$ref": "./labels/prefer_grouped.schema.json"
     },
+    "labels/prefer-stable-order": {
+      "$ref": "./labels/prefer_stable_order.schema.json"
+    },
     "max-lines": {
       "$ref": "./max_lines.schema.json"
     },

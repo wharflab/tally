@@ -1,0 +1,111 @@
+---
+title: "tally/labels/prefer-stable-order"
+description: "Reorder LABEL key/value pairs into a deterministic, human-readable order."
+---
+
+A multi-pair `LABEL` block reads better when keys appear in a stable, logical
+order. This rule reorders pairs inside a single `LABEL` instruction so that
+related image metadata stays grouped and diffs stay small.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Style |
+| Default | Enabled |
+| Auto-fix | Yes (in-block) |
+
+## Description
+
+Image metadata reads best when keys cluster by purpose. The default
+`oci-logical` order follows how reviewers usually scan a `LABEL` block:
+
+| Group | Keys |
+|------:|------|
+| 1. Identity | `org.opencontainers.image.title`, `org.opencontainers.image.description` |
+| 2. Source / refs | `org.opencontainers.image.source`, `org.opencontainers.image.url`, `org.opencontainers.image.documentation` |
+| 3. Ownership / legal | `org.opencontainers.image.authors`, `org.opencontainers.image.vendor`, `org.opencontainers.image.licenses` |
+| 4. Release / provenance | `org.opencontainers.image.version`, `org.opencontainers.image.revision`, `org.opencontainers.image.created`, `org.opencontainers.image.ref.name` |
+| 5. Base image | `org.opencontainers.image.base.name`, `org.opencontainers.image.base.digest` |
+| 6. OpenShift / Kubernetes catalog | `io.k8s.display-name`, `io.k8s.description`, `io.openshift.tags`, `io.openshift.expose-services`, `io.openshift.s2i.scripts-url` |
+| 7. Docker ecosystem | `com.docker.image.source.entrypoint`, `com.docker.extension.*` |
+| 8. Legacy | `org.label-schema.*`, `maintainer` |
+| 9. Unknown reverse-DNS | preserved or namespace-clustered (see `sort-unknown`) |
+| 10. Unknown unqualified | preserved |
+
+The `lexical` order is a flat alphabetical comparator across all keys.
+
+The rule reports when a single multi-pair `LABEL` instruction has at least two
+pairs and the configured comparator says they are not in stable order.
+
+## Auto-fix
+
+The fix swaps the source text of individual `key=value` spans inside the
+existing `LABEL`, leaving continuation backslashes, indentation, and any
+surrounding whitespace untouched. Per-pair edits are narrow on purpose so they
+can co-run with [`tally/labels/prefer-grouped`](/rules/tally/labels/prefer-grouped)
+and [`tally/newline-per-chained-call`](/rules/tally/newline-per-chained-call)
+without conflicts.
+
+The fix is suppressed when:
+
+- The `LABEL` is single-line multi-pair. Let
+  [`tally/newline-per-chained-call`](/rules/tally/newline-per-chained-call) split
+  it onto continuation lines first; the next lint pass then reorders.
+- A comment line splits the pairs. Comments mark intentional sections, and the
+  v1 fixer never crosses them.
+- The block contains a duplicate key. Defer to
+  [`tally/labels/no-duplicate-keys`](/rules/tally/labels/no-duplicate-keys);
+  reordering duplicates would change the effective image metadata.
+- A pair has a dynamic key, an empty key, an expansion error, or uses the
+  legacy `LABEL key value` form.
+
+## Examples
+
+### Bad
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL org.opencontainers.image.description="example image" \
+      org.opencontainers.image.source="https://github.com/example/demo" \
+      org.opencontainers.image.title="demo"
+```
+
+### Good
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL org.opencontainers.image.title="demo" \
+      org.opencontainers.image.description="example image" \
+      org.opencontainers.image.source="https://github.com/example/demo"
+```
+
+## Configuration
+
+```toml
+[rules.tally.labels.prefer-stable-order]
+severity = "info"
+order = "oci-logical"
+sort-unknown = false
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `order` | `"oci-logical"` &#124; `"lexical"` | `"oci-logical"` | Comparator. `"oci-logical"` clusters keys by purpose. `"lexical"` sorts purely alphabetically. |
+| `sort-unknown` | boolean | `false` | When `true`, group 9 (unknown reverse-DNS keys) is clustered by namespace and sorted lexically within each namespace. When `false`, those keys keep their relative source order. Groups 1–8 are unaffected because their ordering is already fully specified, and group 10 (unqualified unknown keys) always preserves source order. |
+
+## Related Rules
+
+- [`tally/labels/no-duplicate-keys`](/rules/tally/labels/no-duplicate-keys) —
+  must run first when a duplicate would otherwise change the effective image
+  metadata after reordering.
+- [`tally/labels/prefer-grouped`](/rules/tally/labels/prefer-grouped) —
+  cooperative: combines scattered `LABEL` instructions into one multi-line
+  block; this rule then reorders the pairs inside that block.
+- [`tally/newline-per-chained-call`](/rules/tally/newline-per-chained-call) —
+  splits single-line multi-pair `LABEL` instructions onto continuation lines so
+  this rule can reorder them on the next lint pass.
+- [`tally/labels/valid-key`](/rules/tally/labels/valid-key)
+- [`tally/labels/no-buildx-git-overlap`](/rules/tally/labels/no-buildx-git-overlap)
+- [`tally/labels/no-stale-base-digest`](/rules/tally/labels/no-stale-base-digest)

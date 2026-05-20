@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/labels/prefer_stable_order.schema.json",
+  "title": "tally/labels/prefer-stable-order rule config",
+  "description": "Configuration options for the tally/labels/prefer-stable-order rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../../rule-config.schema.json#/$defs/exclude" },
+    "order": {
+      "type": "string",
+      "enum": ["oci-logical", "lexical"],
+      "default": "oci-logical",
+      "description": "Comparator to use when checking key order. \"oci-logical\" groups OCI and ecosystem keys by purpose; \"lexical\" sorts purely alphabetically."
+    },
+    "sort-unknown": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, custom reverse-DNS keys are clustered by namespace and sorted lexically within each namespace. When false, custom keys keep their relative source order."
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "order": "oci-logical" },
+    { "order": "lexical", "severity": "info" },
+    { "order": "oci-logical", "sort-unknown": true }
+  ]
+}
