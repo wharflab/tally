@@ -93,7 +93,7 @@ sort-unknown = false
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `order` | `"oci-logical"` &#124; `"lexical"` | `"oci-logical"` | Comparator. `"oci-logical"` clusters keys by purpose. `"lexical"` sorts purely alphabetically. |
-| `sort-unknown` | boolean | `false` | When `true`, custom reverse-DNS keys (groups 9 and below) are clustered by namespace and sorted lexically within each namespace. When `false`, custom keys keep their relative source order. |
+| `sort-unknown` | boolean | `false` | When `true`, group 9 (unknown reverse-DNS keys) is clustered by namespace and sorted lexically within each namespace. When `false`, those keys keep their relative source order. Groups 1–8 are unaffected because their ordering is already fully specified, and group 10 (unqualified unknown keys) always preserves source order. |
 
 ## Related Rules
 
