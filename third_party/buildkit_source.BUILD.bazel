@@ -1,0 +1,18 @@
+filegroup(
+    name = "dockerfile_sources",
+    srcs = glob(
+        ["frontend/dockerfile/**/*.go"],
+        exclude = [
+            "frontend/dockerfile/**/*_test.go",
+            "frontend/dockerfile/**/docs/**",
+            "frontend/dockerfile/**/testdata/**",
+        ],
+    ),
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "dockerfile_ruleset_go",
+    srcs = ["frontend/dockerfile/linter/ruleset.go"],
+    visibility = ["//visibility:public"],
+)

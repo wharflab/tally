@@ -3,17 +3,18 @@
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
 
-# Pinned versions for the embedded ShellCheck wasm. Changing any value here
-# invalidates the local file-target, the CI cache, and the release workflow's
-# restored artifact. See _tools/shellcheck-wasm/versions.env.
-include _tools/shellcheck-wasm/versions.env
-
 # Build tags for the shipped full-featured build (keep CGO enabled while
 # disabling containers/image transports we do not ship).
 BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
+INTELLIJ_PLUGIN_VERSION := $(shell sed -n 's/^plugin_version = "\(.*\)"/\1/p' _integrations/intellij-tally/build/versions.toml | head -n 1)
 
 build: check-shellcheck-wasm
-	GOSUMDB=sum.golang.org CGO_ENABLED=1 go build -tags '$(BUILDTAGS)' -ldflags "-s -w" -o tally
+	TALLY_VERSION="$${TALLY_VERSION:-0.0.0-dev}"; \
+	bazel build --config=release --embed_label="$$TALLY_VERSION" //:tally; \
+	src="$$(tools/bazel/target_output.sh --config=release --embed_label="$$TALLY_VERSION" //:tally)"; \
+	dst=tally; \
+	case "$$src" in *.exe) dst=tally.exe ;; esac; \
+	cp "$$src" "$$dst"
 
 # Friendlier diagnostic than the raw `go:embed` error when the wasm artifact is
 # missing. We don't auto-build here because that would silently pull Docker on
@@ -22,16 +23,19 @@ build: check-shellcheck-wasm
 check-shellcheck-wasm:
 	@if [ ! -s internal/shellcheck/wasm/shellcheck.wasm ]; then \
 		echo "internal/shellcheck/wasm/shellcheck.wasm is missing."; \
-		echo "Run 'make shellcheck-wasm' (requires Docker) to build it, or"; \
+		echo "Run 'make shellcheck-wasm' (Bazel-backed, requires Docker) to build it, or"; \
 		echo "download the artifact from a recent CI run."; \
 		exit 1; \
 	fi
 
 intellij-plugin:
-	bash _integrations/intellij-tally/build/build.sh build
+	bazel build --//:release_version="$(INTELLIJ_PLUGIN_VERSION)" //_integrations/intellij-tally:plugin_zip
+	mkdir -p _integrations/intellij-tally/dist
+	install -m 0644 bazel-bin/_integrations/intellij-tally/tally-intellij-plugin.zip \
+		_integrations/intellij-tally/dist/tally-intellij-plugin-$(INTELLIJ_PLUGIN_VERSION).zip
 
-intellij-plugin-verify:
-	bash _integrations/intellij-tally/build/build.sh verify
+intellij-plugin-verify: intellij-plugin
+	bash _integrations/intellij-tally/build/smoke.sh
 
 intellij-plugin-smoke:
 	bash _integrations/intellij-tally/build/smoke.sh
@@ -40,11 +44,11 @@ GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := $(shell cat .golangci-lint-version | tr -d '[:space:]')
 DEADCODE_VERSION := v0.41.0
 
-test: check-shellcheck-wasm bin/gotestsum-$(GOTESTSUM_VERSION)
-	bin/gotestsum-$(GOTESTSUM_VERSION) --format testname -- -tags '$(BUILDTAGS)' -race -count=1 -timeout=30s ./...
+test: check-shellcheck-wasm
+	bazel test --config=go --config=race //cmd/... //internal/... //_tools/...
 
-test-verbose: check-shellcheck-wasm bin/gotestsum-$(GOTESTSUM_VERSION)
-	bin/gotestsum-$(GOTESTSUM_VERSION) --format standard-verbose -- -tags '$(BUILDTAGS)' -race -count=1 -timeout=30s ./...
+test-verbose: check-shellcheck-wasm
+	bazel test --config=go --config=race --test_output=all //cmd/... //internal/... //_tools/...
 
 lint: check-shellcheck-wasm bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
 	bin/custom-gcl run
@@ -142,36 +146,25 @@ lsp-protocol:
 	bun run _tools/lspgen/fetchModel.mts
 	bun run _tools/lspgen/generate.mts
 
-# File target: the embedded ShellCheck wasm. Prerequisites list every input
-# that can change the output, so Make only rebuilds when the pins, the
-# Dockerfile, the Reactor, or the ast-grep rewrites change. The artifact is
-# .gitignored; fresh checkouts build it on demand (or restore it from CI cache).
+# File target: the embedded ShellCheck wasm. Bazel owns the actual build and
+# tracks the pins, Dockerfile, Reactor, and ast-grep rewrite inputs. The
+# artifact is .gitignored; this target materializes Bazel's declared output
+# into the source location needed by raw `go build`/`go test` tools.
 SHELLCHECK_WASM := internal/shellcheck/wasm/shellcheck.wasm
-SHELLCHECK_WASM_INPUTS := \
-	_tools/shellcheck-wasm/versions.env \
-	_tools/shellcheck-wasm/Dockerfile \
-	_tools/shellcheck-wasm/Reactor.hs \
-	$(wildcard _tools/shellcheck-wasm/rewrites/*.yml)
 
-shellcheck-wasm: $(SHELLCHECK_WASM)
+shellcheck-wasm:
+	@mkdir -p $(dir $(SHELLCHECK_WASM))
+	bazel build //_tools/shellcheck-wasm:shellcheck_wasm
+	cp bazel-bin/_tools/shellcheck-wasm/shellcheck.wasm $(SHELLCHECK_WASM)
+	@touch $(SHELLCHECK_WASM)
 
-$(SHELLCHECK_WASM): $(SHELLCHECK_WASM_INPUTS)
-	@mkdir -p $(dir $@)
-	docker buildx build \
-		--progress=plain \
-		--build-arg GHC_WASM_META_COMMIT="$(GHC_WASM_META_COMMIT)" \
-		--build-arg SHELLCHECK_VERSION="$(patsubst v%,%,$(SHELLCHECK_VERSION))" \
-		--build-arg AST_GREP_VERSION="$(AST_GREP_VERSION)" \
-		-t tally-shellcheck-wasm -f _tools/shellcheck-wasm/Dockerfile _tools/shellcheck-wasm
-	# Extract the built shellcheck.wasm from the container.
-	docker cp "$$(docker create --rm tally-shellcheck-wasm):/shellcheck.wasm" $@
-	@touch $@
+$(SHELLCHECK_WASM): shellcheck-wasm ;
 
 # Force-rebuild target kept for humans who want to refresh after pulling new
 # upstream ShellCheck source without touching a pinned version.
 update-shellcheck-wasm:
 	rm -f $(SHELLCHECK_WASM)
-	$(MAKE) $(SHELLCHECK_WASM)
+	$(MAKE) shellcheck-wasm
 
 clean:
 	rm -f tally

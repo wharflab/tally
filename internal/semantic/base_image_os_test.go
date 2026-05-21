@@ -1,12 +1,12 @@
 package semantic
 
 import (
-	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/wharflab/tally/internal/shell"
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 func TestDetectBaseImageOS(t *testing.T) {
@@ -193,7 +193,9 @@ ENTRYPOINT cmd /c echo hi
 func TestBuilderRealWorldTeamCityNanoServerFixtureInfersWindowsSecondStage(t *testing.T) {
 	t.Parallel()
 
-	content, err := os.ReadFile(filepath.Join("..", "integration", "fixtures", "fix", "real-world-teamcity-nanoserver", "Dockerfile"))
+	content, err := testpath.ReadFile(
+		filepath.Join("..", "integration", "fixtures", "fix", "real-world-teamcity-nanoserver", "Dockerfile"),
+	)
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
@@ -218,7 +220,9 @@ func TestBuilderRealWorldTeamCityNanoServerFixtureInfersWindowsSecondStage(t *te
 func TestBuilderRealWorldPowerShellAlpineFixtureStaysLinux(t *testing.T) {
 	t.Parallel()
 
-	content, err := os.ReadFile(filepath.Join("..", "integration", "fixtures", "fix", "real-world-powershell-alpine", "Dockerfile"))
+	content, err := testpath.ReadFile(
+		filepath.Join("..", "integration", "fixtures", "fix", "real-world-powershell-alpine", "Dockerfile"),
+	)
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}

@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "executable_unix.go",
+        "executable_windows.go",
+        "fileval.go",
+        "utf8.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/fileval",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["fileval_test.go"],
+    embed = [":go_default_library"],
+)

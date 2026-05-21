@@ -1,0 +1,39 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "powershell.go",
+        "script.go",
+        "settings.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/rules/powershell",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/highlight/extract:go_default_library",
+        "//internal/psanalyzer:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "powershell_test.go",
+        "script_pwsh_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/fix:go_default_library",
+        "//internal/psanalyzer:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/testutil:go_default_library",
+    ],
+)

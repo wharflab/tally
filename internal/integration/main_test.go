@@ -3,17 +3,20 @@ package integration
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/wharflab/tally/internal/registry/testutil"
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 var (
@@ -21,7 +24,41 @@ var (
 	coverageDir  string
 	mockRegistry *testutil.MockRegistry
 	acpAgentPath string
+	testTmpDir   string
+	registryEnv  []string
 )
+
+var mockRegistryDomains = []string{
+	"docker.io",
+	"mcr.microsoft.com",
+	"quay.io",
+	"public.ecr.aws",
+	"dhi.io",
+}
+
+type registrySetup struct {
+	confPath        string
+	imageConfigPath string
+}
+
+type integrationTestImageConfigFile struct {
+	Images map[string]integrationTestImageEntry `json:"images"`
+}
+
+type integrationTestImageEntry struct {
+	Configs []integrationTestImageConfig `json:"configs"`
+	Delay   string                       `json:"delay,omitempty"`
+}
+
+type integrationTestImageConfig struct {
+	Env            map[string]string `json:"env,omitempty"`
+	OS             string            `json:"os"`
+	Arch           string            `json:"arch"`
+	Variant        string            `json:"variant,omitempty"`
+	HasHealthcheck bool              `json:"hasHealthcheck,omitempty"`
+	WorkingDir     string            `json:"workingDir,omitempty"`
+	Shell          []string          `json:"shell,omitempty"`
+}
 
 var errNoRulesSelected = errors.New("selectRules requires at least one rule")
 
@@ -40,8 +77,18 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("create temporary directory: %w", err)
 	}
+	testTmpDir = tmpDir
+	originalWD, err := os.Getwd()
+	if err != nil {
+		return 0, fmt.Errorf("get working directory: %w", err)
+	}
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
+	}()
+	defer func() {
+		if err := os.Chdir(originalWD); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "restore working directory: %v\n", err)
+		}
 	}()
 
 	// The two `go build` invocations and the in-process mock registry setup
@@ -52,7 +99,7 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 		wg              sync.WaitGroup
 		binErr, acpErr  error
 		registryErr     error
-		registryTmpConf string
+		registryTmpConf registrySetup
 	)
 	wg.Go(func() {
 		binErr = buildIntegrationBinary(tmpDir)
@@ -77,6 +124,9 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 	if err := finalizeMockRegistry(registryTmpConf); err != nil {
 		return 0, err
 	}
+	if err := materializeBazelIntegrationWorkspace(tmpDir); err != nil {
+		return 0, err
+	}
 
 	code := m.Run()
 	if mockRegistry != nil {
@@ -86,6 +136,11 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 }
 
 func buildIntegrationBinary(tmpDir string) error {
+	if configured, ok, err := configuredTestBinary("TALLY_INTEGRATION_BINARY"); ok || err != nil {
+		binaryPath = configured
+		return err
+	}
+
 	binaryName := "tally"
 	if runtime.GOOS == "windows" {
 		binaryName = "tally.exe"
@@ -118,6 +173,11 @@ func buildIntegrationBinary(tmpDir string) error {
 }
 
 func buildIntegrationAcpAgent(tmpDir string) error {
+	if configured, ok, err := configuredTestBinary("TALLY_ACP_AGENT_BINARY"); ok || err != nil {
+		acpAgentPath = configured
+		return err
+	}
+
 	binName := "tally-acp-testagent"
 	if runtime.GOOS == "windows" {
 		binName += ".exe"
@@ -138,6 +198,53 @@ func buildIntegrationAcpAgent(tmpDir string) error {
 		return fmt.Errorf("build ACP test agent: %w", err)
 	}
 	return nil
+}
+
+func configuredTestBinary(envName string) (string, bool, error) {
+	path := os.Getenv(envName)
+	if path == "" {
+		return "", false, nil
+	}
+	path = resolveConfiguredTestPath(path)
+	if !filepath.IsAbs(path) {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return "", true, fmt.Errorf("get absolute %s path %q: %w", envName, path, err)
+		}
+		path = absPath
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", true, fmt.Errorf("stat %s path %q: %w", envName, path, err)
+	}
+	if info.IsDir() {
+		return "", true, fmt.Errorf("%s path %q is a directory", envName, path)
+	}
+	return path, true, nil
+}
+
+func materializeBazelIntegrationWorkspace(tmpDir string) error {
+	if os.Getenv("TEST_SRCDIR") == "" {
+		return nil
+	}
+	dst := filepath.Join(tmpDir, "workspace", "internal", "integration")
+	for _, name := range []string{"testdata", "fixtures", "__snapshots__"} {
+		if err := copyTestTree(name, filepath.Join(dst, name)); err != nil {
+			return fmt.Errorf("materialize %s: %w", name, err)
+		}
+	}
+	if err := os.Chdir(dst); err != nil {
+		return fmt.Errorf("chdir to materialized integration workspace: %w", err)
+	}
+	return nil
+}
+
+func copyTestTree(src, dst string) error {
+	return testpath.CopyTree(src, dst)
+}
+
+func resolveConfiguredTestPath(path string) string {
+	return testpath.Resolve(path)
 }
 
 // installCachedBinary builds importPath via `go install` to a stable per-user
@@ -222,7 +329,7 @@ func copyFileExclusive(src, dst string) error {
 // `go build` invocations. Image pushes run concurrently against the
 // in-memory registry; AddImage / AddIndex are independent calls and the
 // registry handler is goroutine-safe.
-func prepareMockRegistry(tmpDir string) (string, error) {
+func prepareMockRegistry(tmpDir string) (registrySetup, error) {
 	mockRegistry = testutil.New()
 
 	type imageJob struct {
@@ -379,7 +486,7 @@ func prepareMockRegistry(tmpDir string) (string, error) {
 	wg.Wait()
 	if err := errors.Join(errs...); err != nil {
 		mockRegistry.Close()
-		return "", err
+		return registrySetup{}, err
 	}
 
 	// Write registries.conf redirecting every registry our fixtures touch
@@ -391,38 +498,167 @@ func prepareMockRegistry(tmpDir string) (string, error) {
 	// fixtures using mcr.microsoft.com / quay.io / public.ecr.aws / dhi.io
 	// would silently leak to live registries — slowing tests down,
 	// flaking on network blips, and breaking offline runs.
-	confPath, err := mockRegistry.WriteRegistriesConf(tmpDir,
-		"docker.io",
-		"mcr.microsoft.com",
-		"quay.io",
-		"public.ecr.aws",
-		"dhi.io",
-	)
+	confPath, err := mockRegistry.WriteRegistriesConf(tmpDir, mockRegistryDomains...)
 	if err != nil {
 		mockRegistry.Close()
-		return "", fmt.Errorf("create registries.conf: %w", err)
+		return registrySetup{}, fmt.Errorf("create registries.conf: %w", err)
 	}
-	return confPath, nil
+	imageConfigPath, err := writeIntegrationTestImageConfigs(tmpDir)
+	if err != nil {
+		mockRegistry.Close()
+		return registrySetup{}, err
+	}
+	return registrySetup{confPath: confPath, imageConfigPath: imageConfigPath}, nil
+}
+
+func writeIntegrationTestImageConfigs(tmpDir string) (string, error) {
+	path := filepath.Join(tmpDir, "test-image-configs.json")
+	data, err := json.Marshal(integrationTestImageConfigFile{Images: integrationTestImageConfigs()})
+	if err != nil {
+		return "", fmt.Errorf("marshal test image configs: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", fmt.Errorf("write test image configs: %w", err)
+	}
+	return path, nil
+}
+
+func integrationTestImageConfigs() map[string]integrationTestImageEntry {
+	linuxEnv := map[string]string{"PATH": "/usr/local/bin:/usr/bin:/bin"}
+	pythonEnv := map[string]string{
+		"PATH":           "/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"PYTHON_VERSION": "3.12.0",
+		"LANG":           "C.UTF-8",
+	}
+
+	linuxArm := func(env map[string]string) integrationTestImageConfig {
+		return integrationTestImageConfig{OS: "linux", Arch: "arm64", Env: env}
+	}
+	windowsAmd := func() integrationTestImageConfig {
+		return integrationTestImageConfig{OS: "windows", Arch: "amd64", Env: linuxEnv}
+	}
+
+	images := map[string]integrationTestImageEntry{
+		"docker.io/library/python:3.12": {
+			Configs: []integrationTestImageConfig{linuxArm(pythonEnv)},
+		},
+		"docker.io/library/multiarch:latest": {
+			Configs: []integrationTestImageConfig{
+				{OS: "linux", Arch: "amd64", Env: linuxEnv},
+				{OS: "linux", Arch: "arm64", Env: linuxEnv},
+			},
+		},
+		"docker.io/library/withhealthcheck:latest": {
+			Configs: []integrationTestImageConfig{{
+				OS:             "linux",
+				Arch:           "arm64",
+				Env:            linuxEnv,
+				HasHealthcheck: true,
+			}},
+		},
+		"docker.io/library/slowfailfast:latest": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+			Delay:   "30s",
+		},
+		"docker.io/library/slowtimeout:latest": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+			Delay:   "30s",
+		},
+		"docker.io/library/php:5.6-fpm": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"mcr.microsoft.com/powershell:6.2.1-alpine-3.8": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"mcr.microsoft.com/powershell:7.4-ubuntu-22.04": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"mcr.microsoft.com/powershell:ubuntu-22.04": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"mcr.microsoft.com/windows/servercore:ltsc2022": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"mcr.microsoft.com/windows/servercore:ltsc2025": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"mcr.microsoft.com/windows/servercore/iis:windowsservercore-ltsc2019": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2019": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"mcr.microsoft.com/dotnet/sdk:8.0": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"quay.io/prometheus/node-exporter:latest": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"public.ecr.aws/lambda/python:3.12": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"docker.io/teeks99/msvc-win:14.0": {
+			Configs: []integrationTestImageConfig{windowsAmd()},
+		},
+		"docker.io/pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"docker.io/openresty/openresty:alpine": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+		"dhi.io/debian-base:trixie-dev": {
+			Configs: []integrationTestImageConfig{linuxArm(linuxEnv)},
+		},
+	}
+	return images
 }
 
 // finalizeMockRegistry publishes the env vars that point tally at the mock
 // registry and resets the recorded requests so only test-time pulls show up.
 // Must run on the goroutine that started TestMain (after concurrent setup
 // completes) because os.Setenv mutates process-wide state.
-func finalizeMockRegistry(confPath string) error {
-	if err := os.Setenv("CONTAINERS_REGISTRIES_CONF", confPath); err != nil {
+func finalizeMockRegistry(setup registrySetup) error {
+	if err := os.Setenv("CONTAINERS_REGISTRIES_CONF", setup.confPath); err != nil {
 		mockRegistry.Close()
 		return fmt.Errorf("set CONTAINERS_REGISTRIES_CONF: %w", err)
 	}
+	if err := os.Setenv("REGISTRIES_CONFIG_PATH", setup.confPath); err != nil {
+		mockRegistry.Close()
+		return fmt.Errorf("set REGISTRIES_CONFIG_PATH: %w", err)
+	}
+	if err := os.Setenv("TALLY_TEST_REGISTRY_HOST_OVERRIDES", mockRegistryHostOverrides()); err != nil {
+		mockRegistry.Close()
+		return fmt.Errorf("set TALLY_TEST_REGISTRY_HOST_OVERRIDES: %w", err)
+	}
+	if err := os.Setenv("TALLY_TEST_IMAGE_CONFIGS", setup.imageConfigPath); err != nil {
+		mockRegistry.Close()
+		return fmt.Errorf("set TALLY_TEST_IMAGE_CONFIGS: %w", err)
+	}
+	registryEnv = make([]string, 0, 5)
+	registryEnv = append(registryEnv,
+		"CONTAINERS_REGISTRIES_CONF="+setup.confPath,
+		"REGISTRIES_CONFIG_PATH="+setup.confPath,
+		"TALLY_TEST_REGISTRY_HOST_OVERRIDES="+mockRegistryHostOverrides(),
+		"TALLY_TEST_IMAGE_CONFIGS="+setup.imageConfigPath,
+	)
 	// Set default platform to match the mock registry's image platform (linux/arm64).
 	if err := os.Setenv("DOCKER_DEFAULT_PLATFORM", "linux/arm64"); err != nil {
 		mockRegistry.Close()
 		return fmt.Errorf("set DOCKER_DEFAULT_PLATFORM: %w", err)
 	}
+	registryEnv = append(registryEnv, "DOCKER_DEFAULT_PLATFORM=linux/arm64")
 
 	// Clear setup requests (image pushes) so only test-time requests are tracked.
 	mockRegistry.ResetRequests()
 	return nil
+}
+
+func mockRegistryHostOverrides() string {
+	entries := make([]string, 0, len(mockRegistryDomains))
+	for _, domain := range mockRegistryDomains {
+		entries = append(entries, domain+"="+mockRegistry.Host())
+	}
+	return strings.Join(entries, ",")
 }
 
 // selectRules returns args to disable all rules except the specified ones.

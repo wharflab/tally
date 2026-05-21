@@ -2,7 +2,6 @@ package integration
 
 import (
 	"encoding/json/v2"
-	"os"
 	"os/exec"
 	"testing"
 
@@ -12,9 +11,7 @@ import (
 func TestVersion(t *testing.T) {
 	t.Parallel()
 	cmd := exec.Command(binaryPath, "version")
-	cmd.Env = append(os.Environ(),
-		"GOCOVERDIR="+coverageDir,
-	)
+	cmd.Env = integrationCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("version command failed: %v\noutput: %s", err, output)
@@ -29,9 +26,7 @@ func TestVersion(t *testing.T) {
 func TestVersionJSON(t *testing.T) {
 	t.Parallel()
 	cmd := exec.Command(binaryPath, "version", "--json")
-	cmd.Env = append(os.Environ(),
-		"GOCOVERDIR="+coverageDir,
-	)
+	cmd.Env = integrationCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("version --json failed: %v\noutput: %s", err, output)

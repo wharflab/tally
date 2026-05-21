@@ -1,0 +1,42 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "dedup.go",
+        "directive.go",
+        "enable.go",
+        "exclude.go",
+        "path.go",
+        "processor.go",
+        "severity.go",
+        "snippet.go",
+        "sort.go",
+        "supersede.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/processor",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/directive:go_default_library",
+        "//internal/reporter:go_default_library",
+        "//internal/ruledeprecation:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_bmatcuk_doublestar_v4//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "processor_test.go",
+        "snippet_test.go",
+        "supersede_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/rules:go_default_library",
+    ],
+)

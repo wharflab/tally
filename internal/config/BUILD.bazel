@@ -1,0 +1,40 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "ci.go",
+        "config.go",
+        "overrides.go",
+        "rules.go",
+        "validation.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/config",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/ruleconfig:go_default_library",
+        "//internal/ruledeprecation:go_default_library",
+        "//internal/rules/configutil:go_default_library",
+        "//internal/schemas:go_default_library",
+        "//internal/schemas/generated/config:go_default_library",
+        "//internal/schemas/runtime:go_default_library",
+        "@com_github_gkampitakis_ciinfo//:go_default_library",
+        "@com_github_knadh_koanf_parsers_toml_v2//:go_default_library",
+        "@com_github_knadh_koanf_providers_confmap//:go_default_library",
+        "@com_github_knadh_koanf_providers_env_v2//:go_default_library",
+        "@com_github_knadh_koanf_providers_file//:go_default_library",
+        "@com_github_knadh_koanf_providers_posflag//:go_default_library",
+        "@com_github_knadh_koanf_providers_structs//:go_default_library",
+        "@com_github_knadh_koanf_v2//:go_default_library",
+        "@com_github_spf13_pflag//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "config_test.go",
+        "schema_type_coercion_test.go",
+    ],
+    embed = [":go_default_library"],
+)

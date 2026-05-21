@@ -1,0 +1,53 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "builder.go",
+        "directive.go",
+        "from_args.go",
+        "from_env.go",
+        "graph.go",
+        "platform.go",
+        "scope.go",
+        "semantic.go",
+        "stage_info.go",
+        "undefined_var.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/semantic",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/dockerfile:go_default_library",
+        "//internal/runmount:go_default_library",
+        "//internal/shell:go_default_library",
+        "@com_github_containerd_platforms//:go_default_library",
+        "@com_github_distribution_reference//:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/shell:go_default_library",
+        "@com_github_moby_buildkit//util/suggest:go_default_library",
+        "@com_github_opencontainers_image_spec//specs-go/v1:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "base_image_os_test.go",
+        "builder_from_arg_eval_test.go",
+        "builder_test.go",
+        "from_env_test.go",
+        "semantic_test.go",
+    ],
+    data = ["//internal/integration:fixtures"],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/dockerfile:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/testpath:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/shell:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+    ],
+)

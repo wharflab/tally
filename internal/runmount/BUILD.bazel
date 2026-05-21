@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "edit.go",
+        "runmount.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/runmount",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/sourcemap:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["runmount_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/sourcemap:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)

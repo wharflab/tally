@@ -1,24 +1,25 @@
 ---
 name: Build shellcheck.wasm
 description: |
-  Builds internal/shellcheck/wasm/shellcheck.wasm via buildx with the
-  GitHub Actions cache backend (mode=max). Layer caching is handled
-  transparently by BuildKit: on cache hit the final wasm is restored from
-  cached layers in ~15 seconds; on miss BuildKit rebuilds from the
-  Dockerfile in _tools/shellcheck-wasm/ (~12 minutes) and primes the cache
-  for subsequent runs.
+  Builds internal/shellcheck/wasm/shellcheck.wasm via the Bazel target
+  //_tools/shellcheck-wasm:shellcheck_wasm. Bazel owns the declared output and
+  cache key; the target invokes BuildKit because the build recipe still needs
+  Dockerfile RUN steps to install the GHC WASI toolchain, patch ShellCheck, and
+  compile the reactor module.
 
   Every Linux job that needs the wasm (directly or transitively via
   `go build`/`go test`) should invoke this action before compiling Go code
-  — independent parallel runs are fine, they all share the same GHA cache
-  scope. macOS/Windows jobs cannot run BuildKit; pass `artifact-name` in
-  one Linux job so the action also uploads the wasm as a workflow artifact
-  that `download-shellcheck-wasm` consumes.
+  — independent parallel runs are fine, they share the Bazel external cache.
+  macOS/Windows jobs cannot run BuildKit; pass `artifact-name` in one Linux
+  job so the action also uploads the wasm as a workflow artifact that
+  `download-shellcheck-wasm` consumes.
 
   The setup-buildx-action step installs a recent upstream BuildKit so the
   Dockerfile's `ADD <git-url>?ref=...` instructions work against github.com
   and gitlab.haskell.org — older BuildKit shipped with some Docker Engine
   releases mishandles the 301 redirect that drops `.git` from the URL.
+  The GitHub Actions runtime step exposes the cache variables needed when a
+  manual `docker buildx build` invocation uses the `type=gha` cache backend.
 inputs:
   artifact-name:
     description: |
@@ -32,41 +33,33 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Load pinned versions
-      id: versions
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+    - name: Expose GitHub Actions runtime for BuildKit cache
+      uses: crazy-max/ghaction-github-runtime@v3
+    - name: Set up Bazel
+      uses: bazel-contrib/setup-bazel@0.19.0
+      with:
+        bazelisk-cache: true
+        disk-cache: shellcheck-wasm-${{ runner.os }}
+        external-cache: true
+        repository-cache: true
+        cache-save: ${{ github.event_name != 'pull_request' }}
+    - name: Build shellcheck.wasm
       shell: bash
       run: |
         set -euo pipefail
-        # versions.env is documented as shell-sourceable, so source it with
-        # allexport to match real shell assignment semantics (quoting,
-        # indented comments, CRLF tolerance via word-splitting). The `v`
-        # prefix is stripped from SHELLCHECK_VERSION because the Dockerfile
-        # re-adds it when building the git ref, matching the convention the
-        # Makefile uses via $(patsubst v%,%,$(SHELLCHECK_VERSION)).
-        set -a
-        # shellcheck disable=SC1091
-        . _tools/shellcheck-wasm/versions.env
-        set +a
-        {
-          echo "SHELLCHECK_VERSION=${SHELLCHECK_VERSION#v}"
-          echo "GHC_WASM_META_COMMIT=${GHC_WASM_META_COMMIT}"
-          echo "AST_GREP_VERSION=${AST_GREP_VERSION}"
-        } >> "$GITHUB_OUTPUT"
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
-    - name: Build shellcheck.wasm
-      uses: docker/build-push-action@v7
-      with:
-        context: _tools/shellcheck-wasm
-        file: _tools/shellcheck-wasm/Dockerfile
-        push: false
-        outputs: type=local,dest=internal/shellcheck/wasm
-        cache-from: type=gha,scope=shellcheck-wasm
-        cache-to: type=gha,mode=max,scope=shellcheck-wasm
-        build-args: |
-          SHELLCHECK_VERSION=${{ steps.versions.outputs.SHELLCHECK_VERSION }}
-          GHC_WASM_META_COMMIT=${{ steps.versions.outputs.GHC_WASM_META_COMMIT }}
-          AST_GREP_VERSION=${{ steps.versions.outputs.AST_GREP_VERSION }}
+        bazel build \
+          --action_env=ACTIONS_CACHE_SERVICE_V2 \
+          --action_env=ACTIONS_CACHE_URL \
+          --action_env=ACTIONS_RESULTS_URL \
+          --action_env=ACTIONS_RUNTIME_TOKEN \
+          --action_env=ACTIONS_RUNTIME_URL \
+          --action_env=TALLY_SHELLCHECK_WASM_GHA_CACHE=1 \
+          //_tools/shellcheck-wasm:shellcheck_wasm
+        mkdir -p internal/shellcheck/wasm
+        cp bazel-bin/_tools/shellcheck-wasm/shellcheck.wasm \
+          internal/shellcheck/wasm/shellcheck.wasm
     - name: Verify artifact
       shell: bash
       run: |

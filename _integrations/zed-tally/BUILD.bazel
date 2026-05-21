@@ -1,0 +1,40 @@
+load("@rules_rs//rs:rust_library.bzl", "rust_library")
+load("@rules_rs//rs:rust_shared_library.bzl", "rust_shared_library")
+load("@rules_rs//rs:rust_test.bzl", "rust_test")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "zed_tally_lib",
+    srcs = ["src/tally.rs"],
+    compile_data = [
+        "//packaging/npm:package_json",
+        "//packaging/npm:platform_targets_json",
+        "//packaging/pypi:pyproject_toml",
+    ],
+    crate_name = "zed_tally",
+    edition = "2021",
+    deps = [
+        "@zed_tally_crates//:zed_extension_api",
+    ],
+)
+
+rust_shared_library(
+    name = "zed_tally",
+    srcs = ["src/tally.rs"],
+    compile_data = [
+        "//packaging/npm:package_json",
+        "//packaging/npm:platform_targets_json",
+        "//packaging/pypi:pyproject_toml",
+    ],
+    crate_name = "zed_tally",
+    edition = "2021",
+    deps = [
+        "@zed_tally_crates//:zed_extension_api",
+    ],
+)
+
+rust_test(
+    name = "unit_tests",
+    crate = ":zed_tally_lib",
+)

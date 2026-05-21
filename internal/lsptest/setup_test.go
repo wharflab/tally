@@ -23,6 +23,7 @@ import (
 	"golang.org/x/exp/jsonrpc2"
 
 	protocol "github.com/wharflab/tally/internal/lsp/protocol"
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 var (
@@ -35,6 +36,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+	originalWD, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
 
 	binaryName := "tally"
 	if runtime.GOOS == "windows" {
@@ -42,36 +47,67 @@ func TestMain(m *testing.M) {
 	}
 	binaryPath = filepath.Join(tmpDir, binaryName)
 
-	// Collect coverage only when GOCOVERDIR is set (Linux CI).
-	buildArgs := []string{"build"}
-	coverageDir = os.Getenv("GOCOVERDIR")
-	if coverageDir != "" {
-		coverageDir, err = filepath.Abs(coverageDir)
-		if err != nil {
-			_ = os.RemoveAll(tmpDir)
-			panic("failed to get absolute coverage directory path: " + err.Error())
+	if configured := os.Getenv("TALLY_LSPTEST_BINARY"); configured != "" {
+		configured = resolveConfiguredTestPath(configured)
+		if !filepath.IsAbs(configured) {
+			absConfigured, err := filepath.Abs(configured)
+			if err != nil {
+				_ = os.RemoveAll(tmpDir)
+				panic("failed to canonicalize Bazel tally binary path: " + err.Error())
+			}
+			configured = absConfigured
 		}
-		if err := os.MkdirAll(coverageDir, 0o750); err != nil {
+		if info, err := os.Stat(configured); err != nil {
 			_ = os.RemoveAll(tmpDir)
-			panic("failed to create coverage directory: " + err.Error())
+			panic("failed to stat Bazel tally binary: " + err.Error())
+		} else if info.IsDir() {
+			_ = os.RemoveAll(tmpDir)
+			panic("Bazel tally binary path is a directory: " + configured)
 		}
-		buildArgs = append(buildArgs, "-cover", "-covermode=atomic")
-	}
-	buildArgs = append(buildArgs, "-o", binaryPath, "github.com/wharflab/tally")
+		binaryPath = configured
+	} else {
+		// Collect coverage only when GOCOVERDIR is set (Linux CI).
+		buildArgs := []string{"build"}
+		coverageDir = os.Getenv("GOCOVERDIR")
+		if coverageDir != "" {
+			coverageDir, err = filepath.Abs(coverageDir)
+			if err != nil {
+				_ = os.RemoveAll(tmpDir)
+				panic("failed to get absolute coverage directory path: " + err.Error())
+			}
+			if err := os.MkdirAll(coverageDir, 0o750); err != nil {
+				_ = os.RemoveAll(tmpDir)
+				panic("failed to create coverage directory: " + err.Error())
+			}
+			buildArgs = append(buildArgs, "-cover", "-covermode=atomic")
+		}
+		buildArgs = append(buildArgs, "-o", binaryPath, "github.com/wharflab/tally")
 
-	cmd := exec.Command("go", buildArgs...)
-	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		_ = os.RemoveAll(tmpDir)
-		panic("failed to build binary: " + string(out))
+		cmd := exec.Command("go", buildArgs...)
+		cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			_ = os.RemoveAll(tmpDir)
+			panic("failed to build binary: " + string(out))
+		}
 	}
 
 	if err := warmShellCheckCache(tmpDir); err != nil {
 		_ = os.RemoveAll(tmpDir)
 		panic("failed to warm ShellCheck cache: " + err.Error())
 	}
+	if err := materializeBazelLSPWorkspace(tmpDir); err != nil {
+		if chdirErr := os.Chdir(originalWD); chdirErr != nil {
+			panic("failed to restore working directory: " + chdirErr.Error())
+		}
+		_ = os.RemoveAll(tmpDir)
+		panic("failed to materialize Bazel LSP workspace: " + err.Error())
+	}
 
 	code := m.Run()
+	if err := os.Chdir(originalWD); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		panic("failed to restore working directory: " + err.Error())
+	}
 	_ = os.RemoveAll(tmpDir)
 	os.Exit(code)
 }
@@ -100,6 +136,38 @@ func warmShellCheckCache(tmpDir string) error {
 		return fmt.Errorf("%w: %s", err, out)
 	}
 	return nil
+}
+
+func materializeBazelLSPWorkspace(tmpDir string) error {
+	if os.Getenv("TEST_SRCDIR") == "" {
+		return nil
+	}
+	workspace := filepath.Join(tmpDir, "workspace")
+	if err := copyTestTree("__snapshots__", filepath.Join(workspace, "internal", "lsptest", "__snapshots__")); err != nil {
+		return err
+	}
+	if err := copyTestTree(
+		filepath.Join("..", "integration", "fixtures"),
+		filepath.Join(workspace, "internal", "integration", "fixtures"),
+	); err != nil {
+		return err
+	}
+	packageDir := filepath.Join(workspace, "internal", "lsptest")
+	if err := os.MkdirAll(packageDir, 0o750); err != nil {
+		return err
+	}
+	if err := os.Chdir(packageDir); err != nil {
+		return err
+	}
+	return nil
+}
+
+func copyTestTree(src, dst string) error {
+	return testpath.CopyTree(src, dst)
+}
+
+func resolveConfiguredTestPath(path string) string {
+	return testpath.Resolve(path)
 }
 
 // processIO wraps subprocess stdin/stdout as an io.ReadWriteCloser
@@ -182,7 +250,7 @@ func startTestServer(t *testing.T) *testServer {
 	t.Helper()
 
 	cmd := exec.Command(binaryPath, "lsp", "--stdio")
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2", "GOCOVERDIR="+coverageDir)
 
 	stdin, err := cmd.StdinPipe()
 	require.NoError(t, err)

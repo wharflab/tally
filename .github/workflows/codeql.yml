@@ -26,19 +26,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6.0.2
       - uses: ./.github/actions/shellcheck-wasm
-      - name: Setup Go
-        uses: actions/setup-go@v6.4.0
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: true
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
+          build-mode: manual
           config-file: ./.github/codeql/codeql-config.yml
           languages: go
           # Enable code quality checks in addition to security
           queries: security-and-quality
-      - name: Build
-        run: go build ./...
+      - name: Build for CodeQL extraction
+        run: |
+          bazel build --config=release //:tally
+          go build -tags containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub ./...
       - name: Perform Analysis
         uses: github/codeql-action/analyze@v4

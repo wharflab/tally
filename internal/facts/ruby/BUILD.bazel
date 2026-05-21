@@ -1,0 +1,26 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "facts.go",
+        "gemfile.go",
+        "lockfile.go",
+        "ruby_version.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/facts/ruby",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "facts_test.go",
+        "gemfile_test.go",
+        "lockfile_test.go",
+        "ruby_version_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
+    deps = ["//internal/testpath:go_default_library"],
+)

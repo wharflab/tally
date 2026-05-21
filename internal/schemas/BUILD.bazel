@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "registry_gen.go",
+        "schemas.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/schemas",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["schemas_test.go"],
+    deps = [
+        ":go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/rules/all:go_default_library",
+    ],
+)

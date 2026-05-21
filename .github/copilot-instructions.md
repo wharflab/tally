@@ -5,8 +5,8 @@
 ## Quick Start
 
 ```bash
-make build          # Build tally binary
-make test           # Run all tests
+bazel build --config=release //:tally
+bazel test --config=go --config=race //cmd/... //internal/... //_tools/...
 make lint           # Run golangci-lint (CI mode, no auto-fix)
 make lint-fix       # Run golangci-lint with auto-fix
 make cpd            # Copy/paste detection
@@ -21,7 +21,7 @@ go run . lint --fix --config .tally.toml Dockerfile
 
 ## Critical: JSON v2 Requirement
 
-**This project uses Go's JSON v2 experiment.** `GOEXPERIMENT=jsonv2` is already set in the Makefile.
+**This project uses Go's JSON v2 experiment.** `GOEXPERIMENT=jsonv2` is already set by Bazel, hk, and Make wrappers.
 
 - **Always use** `encoding/json/v2` and `encoding/json/jsontext`
 - **Never use** `encoding/json` (v1) except at external API boundaries
@@ -173,14 +173,13 @@ build tags to disable `containers/image` transports we do not ship:
 BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
 ```
 
-These are set automatically in the Makefile.
+These are set automatically by the Bazel `go` and `release` configs.
 
 ## Commit Conventions
 
 - **Semantic commits** (Conventional Commits): `feat:`, `fix:`, `chore:`, etc.
 - Enforced by `commitlint` via hk (`hk.pkl`)
-- Pre-commit hooks run: `make lint`, `make cpd`, `make test`
-- Pre-push hooks run: `make build`
+- Pre-push hooks run Bazel build/test directly
 
 ## LSP (Language Server Protocol)
 

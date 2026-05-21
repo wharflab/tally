@@ -15,6 +15,8 @@ PAHT = "PAHT"
 # Intentional typo examples in tally/invalid-onbuild-trigger rule docs and tests
 COPPY = "COPPY"
 RUNN = "RUNN"
+# Bazel patch context for C compiler include flags.
+Iinclude = "Iinclude"
 
 [files]
 extend-exclude = ["**/tests/fixtures/**", "**/testdata/**", "design-docs/**", "**/__snapshots__/**"]

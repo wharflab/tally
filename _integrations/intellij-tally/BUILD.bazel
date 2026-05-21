@@ -1,0 +1,118 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_filegroup", "pkg_files", "strip_prefix")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_zip")
+load("//tools/bazel:expand_template.bzl", "expand_template")
+
+package(default_visibility = ["//visibility:public"])
+
+PLUGIN_ID = "io.github.wharflab.tally"
+
+PLUGIN_NAME = "Tally"
+
+PLUGIN_SINCE_BUILD = "252.25557"
+
+KOTLIN_SRCS = glob(["src/main/kotlin/**/*.kt"])
+
+BUNDLED_BINS = glob(
+    ["bundled/bin/**"],
+    allow_empty = True,
+)
+
+RESOURCE_SRCS = [
+    "src/main/resources/META-INF/lsp.xml",
+    "src/main/resources/META-INF/pluginIcon.svg",
+    "src/main/resources/icons/tally.svg",
+]
+
+filegroup(
+    name = "kotlin_sources",
+    srcs = KOTLIN_SRCS,
+)
+
+genrule(
+    name = "empty_bundled_marker_file",
+    outs = ["empty_bundled_marker"],
+    cmd = ": > $@",
+)
+
+filegroup(
+    name = "bundled_bins",
+    srcs = BUNDLED_BINS + [":empty_bundled_marker_file"],
+)
+
+expand_template(
+    name = "patched_plugin_xml",
+    out = "generated/META-INF/plugin.xml",
+    static_substitutions = {
+        " until-build=\"@UNTIL_BUILD@\"": "",
+        "@PLUGIN_ID@": PLUGIN_ID,
+        "@SINCE_BUILD@": PLUGIN_SINCE_BUILD,
+    },
+    substitutions = {
+        "@PLUGIN_VERSION@": "//:release_version",
+    },
+    template = "src/main/resources/META-INF/plugin.xml",
+)
+
+kt_jvm_library(
+    name = "plugin_classes",
+    srcs = KOTLIN_SRCS,
+    deps = [
+        "@intellij_webstorm_sdk//:ide_api",
+        "@rules_kotlin//kotlin/compiler:kotlin-stdlib",
+        "@rules_kotlin//kotlin/compiler:kotlin-stdlib-jdk8",
+    ],
+)
+
+genrule(
+    name = "plugin_jar",
+    srcs = [
+        ":patched_plugin_xml",
+        ":plugin_classes.jar",
+    ] + RESOURCE_SRCS,
+    outs = ["tally-intellij-plugin.jar"],
+    cmd = """
+set -euo pipefail
+tmp="$(@D)/plugin_jar"
+rm -rf "$$tmp"
+mkdir -p "$$tmp/classes" "$$tmp/resources/META-INF" "$$tmp/resources/icons"
+classes_jar="$$(pwd)/$$tmp/plugin_classes.jar"
+cp "$(location :plugin_classes.jar)" "$$classes_jar"
+(cd "$$tmp/classes" && jar -xf "$$classes_jar")
+cp "$(location :patched_plugin_xml)" "$$tmp/resources/META-INF/plugin.xml"
+cp "$(location src/main/resources/META-INF/lsp.xml)" "$$tmp/resources/META-INF/lsp.xml"
+cp "$(location src/main/resources/META-INF/pluginIcon.svg)" "$$tmp/resources/META-INF/pluginIcon.svg"
+cp "$(location src/main/resources/icons/tally.svg)" "$$tmp/resources/icons/tally.svg"
+jar --create --file "$@" -C "$$tmp/classes" . -C "$$tmp/resources" .
+""",
+)
+
+pkg_files(
+    name = "plugin_jar_files",
+    srcs = [":plugin_jar"],
+    attributes = pkg_attributes(mode = "0644"),
+    prefix = PLUGIN_NAME + "/lib",
+)
+
+pkg_files(
+    name = "bundled_bin_files",
+    srcs = BUNDLED_BINS,
+    attributes = pkg_attributes(mode = "0755"),
+    prefix = PLUGIN_NAME + "/bin",
+    strip_prefix = strip_prefix.from_pkg("bundled/bin"),
+)
+
+pkg_filegroup(
+    name = "plugin_zip_files",
+    srcs = [
+        ":bundled_bin_files",
+        ":plugin_jar_files",
+    ],
+)
+
+pkg_zip(
+    name = "plugin_zip",
+    srcs = [":plugin_zip_files"],
+    out = "tally-intellij-plugin.zip",
+    mode = "0644",
+)

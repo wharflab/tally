@@ -3,9 +3,10 @@ package ruby
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
+
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 // fakeReader is a minimal in-memory ContextFileReader.
@@ -354,7 +355,7 @@ func TestLoad_IgnoredCheckErrorTreatedAsIgnored(t *testing.T) {
 
 func mustReadTestdata(t *testing.T, name string) []byte {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", name))
+	data, err := testpath.ReadFile("testdata/" + name)
 	if err != nil {
 		t.Fatalf("read testdata %q: %v", name, err)
 	}

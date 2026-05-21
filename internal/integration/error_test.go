@@ -413,7 +413,7 @@ func runTallyLintRaw(t *testing.T, target string) (string, string, int) {
 	t.Helper()
 
 	cmd := exec.Command(binaryPath, "lint", "--format", "json", "--slow-checks=off", target)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf

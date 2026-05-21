@@ -1,0 +1,33 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "catalog.go",
+        "signal.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/telemetry",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/facts:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "signal_helpers_test.go",
+        "signal_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/facts:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/testutil:go_default_library",
+    ],
+)

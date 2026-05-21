@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["stagename.go"],
+    importpath = "github.com/wharflab/tally/internal/stagename",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["stagename_test.go"],
+    embed = [":go_default_library"],
+)

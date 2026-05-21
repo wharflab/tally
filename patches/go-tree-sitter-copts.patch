@@ -1,0 +1,38 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 6ad762b..2d72069 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -1,4 +1,5 @@
++load("@rules_cc//cc:defs.bzl", "cc_library")
+ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+ # gazelle:proto disable
+@@ -21,8 +22,27 @@ go_library(
+         "tree_cursor.go",
+     ],
+     cgo = True,
+-    copts = ["-Iinclude -Isrc -std=c11 -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE"],
++    cdeps = [":tree_sitter_sources"],
++    copts = [
++        "-std=c11",
++        "-D_POSIX_C_SOURCE=200112L",
++        "-D_DEFAULT_SOURCE",
++    ],
+     importpath = "github.com/tree-sitter/go-tree-sitter",
+     visibility = ["//visibility:public"],
+     deps = ["@com_github_mattn_go_pointer//:go-pointer"],
+ )
++
++cc_library(
++    name = "tree_sitter_sources",
++    hdrs = glob([
++        "include/**/*.h",
++        "src/**/*.h",
++    ]),
++    textual_hdrs = glob(["src/**/*.c"]),
++    includes = [
++        "include",
++        "src",
++    ],
++    visibility = ["//visibility:private"],
++)

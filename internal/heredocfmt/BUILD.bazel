@@ -1,0 +1,43 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "dockerfile.go",
+        "format.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/heredocfmt",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/dockerfile:go_default_library",
+        "//internal/highlight/extract:go_default_library",
+        "//internal/psanalyzer:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@cc_mvdan_sh_v3//syntax:go_default_library",
+        "@com_github_editorconfig_editorconfig_core_go_v2//:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+        "@com_github_pelletier_go_toml_v2//:go_default_library",
+        "@in_gopkg_ini_v1//:go_default_library",
+        "@in_yaml_go_yaml_v4//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "dockerfile_test.go",
+        "format_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/dockerfile:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "@com_github_editorconfig_editorconfig_core_go_v2//:go_default_library",
+    ],
+)

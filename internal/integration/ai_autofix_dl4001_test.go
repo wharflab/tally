@@ -47,7 +47,7 @@ fix = "explicit"
 		dockerfilePath,
 	}
 	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("lint --fix failed: %v\noutput:\n%s", err, output)

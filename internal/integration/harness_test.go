@@ -39,7 +39,10 @@ var fixedSummaryRE = regexp.MustCompile(`(?m)^Fixed (\d+) issues? in \d+ files?$
 
 // buildkitVersionRE normalises the dynamic BuildKit version embedded in output
 // (e.g. SARIF "version" field) so snapshots don't break on dependency bumps.
-var buildkitVersionRE = regexp.MustCompile(`(buildkit v)\d+\.\d+\.\d+`)
+var (
+	buildkitVersionRE     = regexp.MustCompile(`(buildkit v)\d+\.\d+\.\d+`)
+	bazelDevToolVersionRE = regexp.MustCompile(`(?m)^(\s*"version": ")dev("\s*)$`)
+)
 
 func runLintCase(t *testing.T, tc lintCase) {
 	t.Helper()
@@ -63,11 +66,7 @@ func runLintCase(t *testing.T, tc lintCase) {
 	}
 
 	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(),
-		"GOCOVERDIR="+coverageDir,
-	)
-	// Add test-specific environment variables
-	cmd.Env = append(cmd.Env, tc.env...)
+	cmd.Env = integrationCommandEnv(tc.env...)
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
@@ -104,7 +103,7 @@ func runLintCase(t *testing.T, tc lintCase) {
 
 	if tc.snapRaw {
 		// Non-JSON formats (e.g. github-actions .txt, markdown .md)
-		snaps.WithConfig(snaps.Ext(tc.snapExt)).MatchStandaloneSnapshot(t, outputStr)
+		integrationSnapshotConfig(snaps.Ext(tc.snapExt)).MatchStandaloneSnapshot(t, outputStr)
 	} else {
 		// JSON output — MatchStandaloneJSON validates JSON and
 		// defaults to .snap.json; Ext overrides for variants like .sarif.
@@ -117,7 +116,7 @@ func runLintCase(t *testing.T, tc lintCase) {
 		if tc.snapExt != "" {
 			opts = append(opts, snaps.Ext(tc.snapExt))
 		}
-		snaps.WithConfig(opts...).MatchStandaloneJSON(t, outputStr)
+		integrationSnapshotConfig(opts...).MatchStandaloneJSON(t, outputStr)
 	}
 
 	if tc.afterLint != nil {
@@ -170,9 +169,7 @@ func runFixCase(t *testing.T, tc fixCase) {
 		tc.args...)
 	args = append(args, dockerfilePath)
 	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(),
-		"GOCOVERDIR="+coverageDir,
-	)
+	cmd.Env = integrationCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		var exitErr *exec.ExitError
@@ -188,7 +185,7 @@ func runFixCase(t *testing.T, tc fixCase) {
 		t.Fatalf("failed to read fixed Dockerfile: %v", err)
 	}
 
-	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixed))
+	integrationSnapshotConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixed))
 
 	// Check that the output mentions the expected number of fixes
 	outputStr := string(output)
@@ -233,7 +230,7 @@ func runTallyStdin(t *testing.T, input string, args ...string) (string, string, 
 
 	cmd := exec.Command(binaryPath, args...)
 	cmd.Stdin = strings.NewReader(input)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = &stdoutBuf

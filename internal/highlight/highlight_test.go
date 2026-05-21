@@ -1,12 +1,12 @@
 package highlight
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/wharflab/tally/internal/highlight/core"
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 func TestAnalyze_WindowsRunPathWinsOverShellFallback(t *testing.T) {
@@ -165,7 +165,7 @@ func TestAnalyze_ShellcheckWasmDockerfile(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join("..", "..", "_tools", "shellcheck-wasm", "Dockerfile")
-	source, err := os.ReadFile(path)
+	source, err := testpath.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}

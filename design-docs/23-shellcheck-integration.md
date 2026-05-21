@@ -372,30 +372,30 @@ Suggested layout:
 
 - `_tools/shellcheck-wasm/Dockerfile` (builds `shellcheck.wasm`)
 - `_tools/shellcheck-wasm/rewrites/*.yml` (ast-grep rewrites applied during wasm build)
-- `Makefile` (pins upstream ShellCheck tag via `SHELLCHECK_VERSION`, e.g. `v0.11.0`)
-- `internal/shellcheck/wasm/shellcheck.wasm` (generated artifact; checked in for reproducible builds)
+- `_tools/shellcheck-wasm/versions.env` (pins upstream ShellCheck tag and tool versions)
+- `_tools/shellcheck-wasm/BUILD.bazel` (Bazel target for the wasm and `rules_img` scratch image)
+- `internal/shellcheck/wasm/shellcheck.wasm` (generated artifact; `.gitignore`d and restored/built before raw Go tools)
 - `internal/shellcheck/wasm/wasm.go` (`//go:embed shellcheck.wasm`)
 
-Update workflow (proposed):
+Update workflow:
 
-- `make update-shellcheck-wasm` (requires Docker) rebuilds the wasm and writes `internal/shellcheck/wasm/shellcheck.wasm`.
-- `make update-shellcheck-wasm-host` (macOS arm64; no Docker) rebuilds the wasm and writes `internal/shellcheck/wasm/shellcheck.wasm`
-  using a repo-local `ghc-wasm-meta` toolchain installed under `bin/`.
-- Keep the generated wasm checked in so `go build ./...` works without requiring a Haskell/WASI toolchain.
+- `bazel build //_tools/shellcheck-wasm:shellcheck_wasm` (requires Docker/BuildKit) builds Bazel's declared wasm output.
+- `make update-shellcheck-wasm` rebuilds via Bazel and writes `internal/shellcheck/wasm/shellcheck.wasm` for raw Go tools.
+- CI Linux jobs build or restore the wasm through the `shellcheck-wasm` composite action; macOS/Windows jobs download the workflow artifact.
 
 Example (one possible implementation):
 
 ```bash
-docker build -t tally-shellcheck-wasm -f _tools/shellcheck-wasm/Dockerfile _tools/shellcheck-wasm
-docker run --rm -v "$PWD/internal/shellcheck/wasm:/out" tally-shellcheck-wasm
+bazel build //_tools/shellcheck-wasm:shellcheck_wasm
+cp bazel-bin/_tools/shellcheck-wasm/shellcheck.wasm internal/shellcheck/wasm/shellcheck.wasm
 ```
 
 Build steps (mirrors the proven `go-shellcheck` approach):
 
 - Base image: `dhi.io/debian-base:trixie-dev`
 - Install: `build-essential`, `curl`, `git`, `jq`, `unzip`, `xz-utils`, `zstd`
-- Fetch and set up `ghc-wasm-meta` pinned commit (`GHC_WASM_META_COMMIT` in `Makefile`, fetched via git `ADD`)
-- Fetch ShellCheck source at the pinned tag (`SHELLCHECK_VERSION` in `Makefile`, fetched via git `ADD`) and run `./striptests`
+- Fetch and set up `ghc-wasm-meta` pinned commit (`GHC_WASM_META_COMMIT` in `versions.env`, fetched via git `ADD`)
+- Fetch ShellCheck source at the pinned tag (`SHELLCHECK_VERSION` in `versions.env`, fetched via git `ADD`) and run `./striptests`
 - Apply AST-based rewrites from `_tools/shellcheck-wasm/rewrites/*.yml` (ast-grep; in lexical order)
 - Build: `. ~/.ghc-wasm/env && wasm32-wasi-cabal update && wasm32-wasi-cabal build --allow-newer shellcheck`
 - Optimize: `wasm-opt -O3 --flatten --rereloop --converge ... -o shellcheck.wasm`
@@ -460,7 +460,7 @@ Notes:
 
 Maintaining rewrites across ShellCheck upgrades:
 
-1. Bump `SHELLCHECK_VERSION` in `Makefile`.
+1. Bump `SHELLCHECK_VERSION` in `_tools/shellcheck-wasm/versions.env`.
 2. Run `make update-shellcheck-wasm`.
 3. If the build fails during rewrite preflight/idempotence:
    - Clone the new ShellCheck tag locally, run `./striptests`, and re-apply the rewrite intent to see what changed upstream.
@@ -670,7 +670,7 @@ Keep this heuristic **opt-in** or gated behind a “best effort” mode since it
 Embedding `shellcheck.wasm` means the Tally binary distributes ShellCheck “object code” as part of the combined work. With Tally itself being
 AGPLv3, section 13 permits combining with GPLv3-covered work — but we should still make compliance *easy* and auditable:
 
-- Pin the exact upstream ShellCheck version tag used to build the wasm (`SHELLCHECK_VERSION` in `Makefile`).
+- Pin the exact upstream ShellCheck version tag used to build the wasm (`SHELLCHECK_VERSION` in `_tools/shellcheck-wasm/versions.env`).
 - Keep the wasm build recipe in-repo (`_tools/shellcheck-wasm/Dockerfile`) and make it reproducible (pinned toolchain commit, pinned build flags).
 - When publishing release binaries, publish “Corresponding Source” alongside them (recommended: a `source.tar.gz` release asset) that includes:
   - the Tally source at that release tag
@@ -685,20 +685,20 @@ This should be treated as release-engineering, not something end-users need to r
 
 We intentionally pin *two* things:
 
-- ShellCheck version tag in `Makefile` (`SHELLCHECK_VERSION`)
-- GHC WASI toolchain meta commit in `_tools/shellcheck-wasm/Dockerfile` (`ghc-wasm-meta` commit)
+- ShellCheck version tag in `_tools/shellcheck-wasm/versions.env` (`SHELLCHECK_VERSION`)
+- GHC WASI toolchain meta commit in `_tools/shellcheck-wasm/versions.env` (`GHC_WASM_META_COMMIT`)
 
 ShellCheck bumps are expected. Toolchain bumps should be rarer and treated as “infrastructure changes”.
 
 ### Renovate integration (proposed)
 
-Add a Renovate regex manager for `SHELLCHECK_VERSION` in `Makefile` so we get PRs when ShellCheck releases. Example:
+Add a Renovate regex manager for `SHELLCHECK_VERSION` in `_tools/shellcheck-wasm/versions.env` so we get PRs when ShellCheck releases. Example:
 
 ```json
 {
   "customType": "regex",
-  "managerFilePatterns": ["/^Makefile$/"],
-  "matchStrings": ["SHELLCHECK_VERSION\\s*[:=]\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
+  "managerFilePatterns": ["/^_tools/shellcheck-wasm/versions\\.env$/"],
+  "matchStrings": ["SHELLCHECK_VERSION=(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
   "depNameTemplate": "koalaman/shellcheck",
   "datasourceTemplate": "github-releases",
   "versioningTemplate": "semver"

@@ -1,0 +1,10 @@
+exports_files(
+    ["pyproject.toml"],
+    visibility = ["//_integrations/zed-tally:__pkg__"],
+)
+
+alias(
+    name = "pyproject_toml",
+    actual = "pyproject.toml",
+    visibility = ["//_integrations/zed-tally:__pkg__"],
+)

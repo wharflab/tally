@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["sourcemap.go"],
+    importpath = "github.com/wharflab/tally/internal/sourcemap",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "effective_test.go",
+        "sourcemap_test.go",
+    ],
+    embed = [":go_default_library"],
+)

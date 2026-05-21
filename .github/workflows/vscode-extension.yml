@@ -21,27 +21,49 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/shellcheck-wasm
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}
+          external-cache: true
+          repository-cache: true
+          cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: Build smoke artifacts
+        run: |
+          bazel build --config=release //_integrations/vscode-tally:extension_bundle
+          bazel build \
+            --collect_code_coverage \
+            --instrumentation_filter=//... \
+            --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub \
+            //:tally
+      - name: Typescript check
+        run: bazel run //_integrations/vscode-tally:typecheck
+      - name: Lint
+        run: bazel run //_integrations/vscode-tally:lint
+      - name: Formatting check
+        run: bazel run //_integrations/vscode-tally:format_check
+      - name: Test packaging
+        run: bazel run //_integrations/vscode-tally:package_vscode_extension -- "$PWD/_integrations/vscode-tally/tally.vsix"
+      - name: Resolve Bazel smoke artifacts
+        run: |
+          set -euo pipefail
+          BUNDLE="$(tools/bazel/target_output.sh //_integrations/vscode-tally:extension_bundle)"
+          BINARY="$(tools/bazel/target_output.sh \
+            --collect_code_coverage \
+            --instrumentation_filter=//... \
+            --@rules_go//go/config:tags=containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub \
+            //:tally)"
+          echo "TALLY_VSCODE_BUNDLE=$PWD/$BUNDLE" >> "$GITHUB_ENV"
+          echo "TALLY_VSCODE_BINARY=$PWD/$BINARY" >> "$GITHUB_ENV"
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
       - name: Install extension dependencies
         working-directory: _integrations/vscode-tally
         run: bun install --frozen-lockfile
-      - name: Typescript check
-        working-directory: _integrations/vscode-tally
-        run: bun run typecheck
-      - name: Lint
-        working-directory: _integrations/vscode-tally
-        run: bun run lint
-      - name: Formatting check
-        working-directory: _integrations/vscode-tally
-        run: bun run format:check
-      - name: Test packaging
-        working-directory: _integrations/vscode-tally
-        run: bun run vsce:package
       - name: Resolve VS Code version
         id: vscode
         run: |
@@ -66,10 +88,15 @@ jobs:
         run: xvfb-run -a bun run test:e2e
       - name: Convert coverage
         run: |
-          go tool covdata textfmt -i="$GOCOVERDIR" -o=coverage-vscode-smoke.txt
-          # Force generated code to 100% coverage to avoid skewing project totals.
-          bash scripts/filter-go-coverprofile.sh coverage-vscode-smoke.txt coverage-vscode-smoke.filtered.txt
+          if find "$GOCOVERDIR" -type f | grep -q .; then
+            go tool covdata textfmt -i="$GOCOVERDIR" -o=coverage-vscode-smoke.txt
+            # Force generated code to 100% coverage to avoid skewing project totals.
+            bash scripts/filter-go-coverprofile.sh coverage-vscode-smoke.txt coverage-vscode-smoke.filtered.txt
+          else
+            echo "No Go coverage files were produced by Bazel-built smoke artifacts."
+          fi
       - name: Upload coverage to Codecov
+        if: ${{ hashFiles('coverage-vscode-smoke.filtered.txt') != '' }}
         uses: codecov/codecov-action@v6
         with:
           use_oidc: true
