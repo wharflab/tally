@@ -16,7 +16,6 @@ import (
 	"go.podman.io/image/v5/docker/reference"
 	"go.podman.io/image/v5/manifest"
 	"go.podman.io/image/v5/pkg/blobinfocache/memory"
-	"go.podman.io/image/v5/pkg/cli/environment"
 	"go.podman.io/image/v5/types"
 
 	godigest "github.com/opencontainers/go-digest"
@@ -38,14 +37,10 @@ type ContainersResolver struct {
 }
 
 // NewContainersResolver creates a resolver using the default system context.
-// It respects CONTAINERS_REGISTRIES_CONF / REGISTRIES_CONFIG_PATH environment
-// variables for registry mirrors and redirects.
+// CONTAINERS_REGISTRIES_CONF is honored automatically by sysregistriesv2 when
+// resolving registry mirrors and redirects.
 func NewContainersResolver() *ContainersResolver {
-	sysCtx := &types.SystemContext{}
-	// Apply environment variable overrides for registries.conf discovery.
-	// Error is ignored: env var overrides are optional and missing vars are not fatal.
-	_ = environment.UpdateRegistriesConf(sysCtx) //nolint:errcheck // optional env var override; non-fatal
-	return &ContainersResolver{sysCtx: sysCtx, blobCache: memory.New()}
+	return &ContainersResolver{sysCtx: &types.SystemContext{}, blobCache: memory.New()}
 }
 
 // NewContainersResolverWithContext creates a resolver with a custom system context.
