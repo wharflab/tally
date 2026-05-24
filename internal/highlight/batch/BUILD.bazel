@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "tokenize.go",
+        "tokenize_nocgo.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/highlight/batch",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/highlight/core:go_default_library",
+        "//internal/highlight/tsutil:go_default_library",
+        "@com_github_wharflab_tree_sitter_batch//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["tokenize_test.go"],
+    embed = [":go_default_library"],
+    deps = ["//internal/highlight/core:go_default_library"],
+)

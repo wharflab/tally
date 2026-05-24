@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "dl3001.gen.go",
+        "dl3026.gen.go",
+        "dl4001.gen.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/schemas/generated/rules/hadolint",
+    visibility = ["//:__subpackages__"],
+    deps = ["//internal/schemas/generated/rules/ruleschema:go_default_library"],
+)

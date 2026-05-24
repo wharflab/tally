@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["render.go"],
+    importpath = "github.com/wharflab/tally/internal/highlight/renderansi",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/highlight/core:go_default_library",
+        "//internal/highlight/theme:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["render_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/highlight/core:go_default_library",
+        "//internal/highlight/theme:go_default_library",
+    ],
+)

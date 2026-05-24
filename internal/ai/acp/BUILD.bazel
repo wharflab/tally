@@ -1,0 +1,37 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "client.go",
+        "errors.go",
+        "process_nonwindows.go",
+        "process_windows.go",
+        "runner.go",
+        "tailbuf.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/ai/acp",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@com_github_armon_circbuf//:go_default_library",
+        "@com_github_coder_acp_go_sdk//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "client_test.go",
+        "runner_lifecycle_unix_test.go",
+        "runner_test.go",
+    ],
+    data = ["//internal/ai/acp/testdata/testagent"],
+    embed = [":go_default_library"],
+    env = {
+        "TALLY_ACP_AGENT_BINARY": "$(rlocationpath //internal/ai/acp/testdata/testagent)",
+    },
+    deps = [
+        "//internal/testpath:go_default_library",
+        "@com_github_coder_acp_go_sdk//:go_default_library",
+    ],
+)

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/distribution/registry/api/errcode"
@@ -25,6 +27,9 @@ import (
 
 func init() {
 	NewDefaultResolver = func() ImageResolver {
+		if resolver := newTestImageResolverFromEnv(); resolver != nil {
+			return resolver
+		}
 		return NewContainersResolver()
 	}
 }
@@ -33,8 +38,9 @@ func init() {
 // image configs from OCI/Docker registries. It respects registries.conf and
 // auth.json via types.SystemContext.
 type ContainersResolver struct {
-	sysCtx    *types.SystemContext
-	blobCache types.BlobInfoCache
+	sysCtx        *types.SystemContext
+	blobCache     types.BlobInfoCache
+	hostOverrides map[string]string
 }
 
 // NewContainersResolver creates a resolver using the default system context.
@@ -45,7 +51,21 @@ func NewContainersResolver() *ContainersResolver {
 	// Apply environment variable overrides for registries.conf discovery.
 	// Error is ignored: env var overrides are optional and missing vars are not fatal.
 	_ = environment.UpdateRegistriesConf(sysCtx) //nolint:errcheck // optional env var override; non-fatal
-	return &ContainersResolver{sysCtx: sysCtx, blobCache: memory.New()}
+	if sysCtx.SystemRegistriesConfPath != "" && sysCtx.SystemRegistriesConfDirPath == "" {
+		// An explicit registries.conf should be deterministic; otherwise
+		// host-level registries.conf.d drop-ins can rewrite short-name aliases
+		// differently on CI runners than on developer machines.
+		sysCtx.SystemRegistriesConfDirPath = isolatedRegistriesConfDirPath()
+	}
+	hostOverrides := testRegistryHostOverridesFromEnv()
+	if len(hostOverrides) > 0 {
+		sysCtx.DockerInsecureSkipTLSVerify = types.OptionalBoolTrue
+	}
+	return &ContainersResolver{sysCtx: sysCtx, blobCache: memory.New(), hostOverrides: hostOverrides}
+}
+
+func isolatedRegistriesConfDirPath() string {
+	return filepath.Join(os.TempDir(), fmt.Sprintf("tally-no-registries-conf.d-%d", os.Getpid()))
 }
 
 // NewContainersResolverWithContext creates a resolver with a custom system context.
@@ -65,6 +85,12 @@ func (r *ContainersResolver) ResolveConfig(ctx context.Context, ref, platform st
 	}
 	// Ensure we have a tag or digest.
 	named = reference.TagNameOnly(named)
+	if len(r.hostOverrides) > 0 {
+		named, err = remapTestRegistryHost(named, r.hostOverrides)
+		if err != nil {
+			return ImageConfig{}, &NotFoundError{Ref: ref, Err: fmt.Errorf("apply test registry override: %w", err)}
+		}
+	}
 
 	// Create a docker reference.
 	dockerRef, err := docker.NewReference(named)
@@ -243,8 +269,42 @@ func formatPlatform(p *imgspecv1.Platform) string {
 	return formatPlatformParts(p.OS, p.Architecture, p.Variant)
 }
 
-func formatPlatformParts(os, arch, variant string) string {
-	s := os + "/" + arch
+func remapTestRegistryHost(named reference.Named, overrides map[string]string) (reference.Named, error) {
+	host, ok := overrides[reference.Domain(named)]
+	if !ok {
+		return named, nil
+	}
+
+	ref := host + "/" + reference.Path(named)
+	if tagged, ok := named.(reference.Tagged); ok {
+		ref += ":" + tagged.Tag()
+	}
+	if digested, ok := named.(reference.Digested); ok {
+		ref += "@" + digested.Digest().String()
+	}
+	return reference.ParseNormalizedNamed(ref)
+}
+
+func testRegistryHostOverridesFromEnv() map[string]string {
+	raw := os.Getenv("TALLY_TEST_REGISTRY_HOST_OVERRIDES")
+	if raw == "" {
+		return nil
+	}
+	overrides := make(map[string]string)
+	for entry := range strings.SplitSeq(raw, ",") {
+		key, value, ok := strings.Cut(entry, "=")
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if !ok || key == "" || value == "" {
+			continue
+		}
+		overrides[key] = value
+	}
+	return overrides
+}
+
+func formatPlatformParts(osName, arch, variant string) string {
+	s := osName + "/" + arch
 	if variant != "" {
 		s += "/" + variant
 	}

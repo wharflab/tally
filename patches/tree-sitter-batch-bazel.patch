@@ -1,0 +1,48 @@
+diff --git a/bindings/go/BUILD.bazel b/bindings/go/BUILD.bazel
+index 8bc4f39..4e99f24 100644
+--- a/bindings/go/BUILD.bazel
++++ b/bindings/go/BUILD.bazel
+@@ -5,7 +5,7 @@ go_library(
+     name = "go",
+     srcs = ["binding.go"],
+     cgo = True,
+-    copts = ["-std=c11 -fPIC -Ibindings/go/external/gazelle++go_deps+com_github_wharflab_tree_sitter_batch/src"],
++    cdeps = ["//src:parser"],
+     importpath = "github.com/wharflab/tree-sitter-batch/bindings/go",
+     visibility = ["//visibility:public"],
+ )
+diff --git a/bindings/go/binding.go b/bindings/go/binding.go
+index b252fd0..30b609b 100644
+--- a/bindings/go/binding.go
++++ b/bindings/go/binding.go
+@@ -1,10 +1,8 @@
+ package tree_sitter_batch
+
+-// #cgo CFLAGS: -std=c11 -fPIC -I${SRCDIR}/../../src
+-// #include "../../src/parser.c"
+-// #if __has_include("../../src/scanner.c")
+-// #include "../../src/scanner.c"
+-// #endif
++// #include "tree_sitter/parser.h"
++//
++// const TSLanguage *tree_sitter_batch(void);
+ import "C"
+
+ import "unsafe"
+diff --git a/src/BUILD.bazel b/src/BUILD.bazel
+new file mode 100644
+index 0000000..f221180
+--- /dev/null
++++ b/src/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_cc//cc:defs.bzl", "cc_library")
++
++cc_library(
++    name = "parser",
++    srcs = ["parser.c"],
++    hdrs = glob(["tree_sitter/*.h"]),
++    copts = ["-std=c11"],
++    includes = ["."],
++    visibility = ["//visibility:public"],
++)
++

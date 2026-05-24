@@ -1,0 +1,43 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "directive.go",
+        "facts.go",
+        "filter.go",
+        "format.go",
+        "lex.go",
+        "parser.go",
+        "semantic.go",
+        "span.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/directive",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/facts:go_default_library",
+        "//internal/ruledeprecation:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "conversion_test.go",
+        "directive_test.go",
+        "format_test.go",
+        "lex_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/facts:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+    ],
+)

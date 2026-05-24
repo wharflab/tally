@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 type upstreamRuleDef struct {
@@ -121,16 +123,91 @@ func diffSortedStrings(want, got []string) ([]string, []string) {
 func mustBuildkitModuleDir(t *testing.T) string {
 	t.Helper()
 
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "github.com/moby/buildkit")
-	out, err := cmd.Output()
+	if configured := os.Getenv("TALLY_BUILDKIT_RULESET_GO"); configured != "" {
+		rulesetPath := resolveConfiguredTestPath(configured)
+		if _, err := os.Stat(rulesetPath); err != nil {
+			t.Fatalf("resolve Bazel BuildKit ruleset source: %v", err)
+		}
+		return buildkitModuleDirFromRulesetPath(rulesetPath)
+	}
+
+	goBinary := "go"
+	if configured := os.Getenv("TALLY_GO_BINARY"); configured != "" {
+		goBinary = resolveConfiguredTestPath(configured)
+	}
+	//nolint:gosec // Test-only Go binary is either "go" or Bazel runfile data.
+	cmd := exec.Command(
+		goBinary,
+		"list",
+		"-m",
+		"-f",
+		"{{.Dir}}",
+		"github.com/moby/buildkit",
+	)
+	cmd.Env = withoutEnv(os.Environ(), "GOEXPERIMENT")
+	if dir := nearestGoModuleDir(); dir != "" {
+		cmd.Dir = dir
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("go list buildkit module dir: %v", err)
+		t.Fatalf("go list buildkit module dir: %v\n%s", err, out)
 	}
 	dir := strings.TrimSpace(string(out))
 	if dir == "" {
 		t.Fatal("empty buildkit module dir from go list")
 	}
 	return dir
+}
+
+func TestBuildkitModuleDirFromRulesetPath(t *testing.T) {
+	t.Parallel()
+
+	rulesetPath := filepath.Join("repo", "frontend", "dockerfile", "linter", "ruleset.go")
+	got := buildkitModuleDirFromRulesetPath(rulesetPath)
+	if got != "repo" {
+		t.Fatalf("module dir mismatch: %q", got)
+	}
+}
+
+func buildkitModuleDirFromRulesetPath(rulesetPath string) string {
+	return filepath.Clean(filepath.Join(filepath.Dir(rulesetPath), "..", "..", ".."))
+}
+
+func nearestGoModuleDir() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
+			return wd
+		}
+		parent := filepath.Dir(wd)
+		if parent == wd {
+			return ""
+		}
+		wd = parent
+	}
+}
+
+func resolveConfiguredTestPath(path string) string {
+	return testpath.Resolve(path)
+}
+
+func withoutEnv(env []string, keys ...string) []string {
+	blocked := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		blocked[key] = struct{}{}
+	}
+	out := env[:0]
+	for _, item := range env {
+		key, _, _ := strings.Cut(item, "=")
+		if _, ok := blocked[key]; ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func mustUpstreamRuleDefinitions(t *testing.T) []upstreamRuleDef {

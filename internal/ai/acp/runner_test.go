@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wharflab/tally/internal/testpath"
 )
 
 var testAgentBin string
@@ -25,6 +27,18 @@ func TestMain(m *testing.M) {
 }
 
 func buildTestAgent() (string, error) {
+	if configured := os.Getenv("TALLY_ACP_AGENT_BINARY"); configured != "" {
+		path := resolveConfiguredTestPath(configured)
+		info, err := os.Stat(path)
+		if err != nil {
+			return "", fmt.Errorf("stat configured test agent: %w", err)
+		}
+		if info.IsDir() {
+			return "", fmt.Errorf("configured test agent is a directory: %s", path)
+		}
+		return path, nil
+	}
+
 	tmp, err := os.MkdirTemp("", "tally-acp-testagent-*")
 	if err != nil {
 		return "", fmt.Errorf("mkdtemp: %w", err)
@@ -42,6 +56,10 @@ func buildTestAgent() (string, error) {
 		return "", fmt.Errorf("build test agent: %w", err)
 	}
 	return out, nil
+}
+
+func resolveConfiguredTestPath(path string) string {
+	return testpath.Resolve(path)
 }
 
 func TestRunner_HappyPath(t *testing.T) {

@@ -1,0 +1,36 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "async_resolver.go",
+        "containers.go",
+        "factory.go",
+        "oci.go",
+        "resolver.go",
+        "test_env_resolver.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/registry",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/async:go_default_library",
+        "@com_github_cenkalti_backoff_v5//:go_default_library",
+        "@com_github_docker_distribution//registry/api/errcode:go_default_library",
+        "@com_github_docker_distribution//registry/api/v2:go_default_library",
+        "@com_github_opencontainers_go_digest//:go_default_library",
+        "@com_github_opencontainers_image_spec//specs-go/v1:go_default_library",
+        "@io_podman_go_image_v5//docker:go_default_library",
+        "@io_podman_go_image_v5//docker/reference:go_default_library",
+        "@io_podman_go_image_v5//manifest:go_default_library",
+        "@io_podman_go_image_v5//pkg/blobinfocache/memory:go_default_library",
+        "@io_podman_go_image_v5//pkg/cli/environment:go_default_library",
+        "@io_podman_go_image_v5//types:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["resolver_test.go"],
+    embed = [":go_default_library"],
+    deps = ["//internal/async:go_default_library"],
+)

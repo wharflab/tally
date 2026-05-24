@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "protocol.go",
+        "runner.go",
+        "unavailable.go",
+        "version.go",
+    ],
+    embedsrcs = [
+        "psscriptanalyzer.version",
+        "sidecar/Tally.PSSA.Sidecar.ps1",
+    ],
+    importpath = "github.com/wharflab/tally/internal/psanalyzer",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["runner_test.go"],
+    embed = [":go_default_library"],
+)

@@ -1,0 +1,26 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "consistent_indentation.gen.go",
+        "eol_last.gen.go",
+        "max_lines.gen.go",
+        "newline_between_instructions.gen.go",
+        "newline_per_chained_call.gen.go",
+        "no_multi_spaces.gen.go",
+        "no_multiple_empty_lines.gen.go",
+        "no_trailing_spaces.gen.go",
+        "prefer_add_unpack.gen.go",
+        "prefer_copy_heredoc.gen.go",
+        "prefer_curl_config.gen.go",
+        "prefer_formatted_heredocs.gen.go",
+        "prefer_multi_stage_build.gen.go",
+        "prefer_run_heredoc.gen.go",
+        "prefer_wget_config.gen.go",
+        "require_secret_mounts.gen.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/schemas/generated/rules/tally",
+    visibility = ["//:__subpackages__"],
+    deps = ["//internal/schemas/generated/rules/ruleschema:go_default_library"],
+)

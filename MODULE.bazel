@@ -1,0 +1,177 @@
+module(
+    name = "tally",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "rules_go", version = "0.60.0")
+bazel_dep(name = "gazelle", version = "0.51.0")
+bazel_dep(name = "hermetic_cc_toolchain", version = "4.1.0")
+bazel_dep(name = "rules_bun", version = "1.0.3")
+bazel_dep(name = "rules_img", version = "0.3.11")
+bazel_dep(name = "rules_java", version = "9.3.0")
+bazel_dep(name = "rules_pkg", version = "1.2.0")
+bazel_dep(name = "rules_kotlin", version = "2.3.20")
+bazel_dep(name = "rules_rs", version = "0.0.58")
+
+git_override(
+    module_name = "rules_bun",
+    commit = "ef010b3c12c480d7ea1d3eacedb6cd9811231dae",
+    patch_strip = 1,
+    patches = ["//patches:rules-bun-stage-node-modules.patch"],
+    remote = "https://github.com/JacobDevelops/rules_bun.git",
+)
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.from_file(
+    name = "tally_go_sdk",
+    experiments = ["jsonv2"],
+    go_mod = "//:go.mod",
+)
+use_repo(go_sdk, "tally_go_sdk")
+
+zig_toolchains = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains")
+use_repo(zig_toolchains, "zig_sdk")
+
+go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
+go_deps.from_file(go_mod = "//:go.mod")
+go_deps.gazelle_default_attributes(
+    build_file_generation = "clean",
+    directives = [
+        "gazelle:proto disable",
+    ],
+)
+go_deps.module_override(
+    patch_strip = 1,
+    patches = ["//patches:tree-sitter-batch-bazel.patch"],
+    path = "github.com/wharflab/tree-sitter-batch",
+)
+go_deps.module_override(
+    patch_strip = 1,
+    patches = ["//patches:go-tree-sitter-copts.patch"],
+    path = "github.com/tree-sitter/go-tree-sitter",
+)
+go_deps.module_override(
+    patch_strip = 1,
+    patches = ["//patches:tree-sitter-powershell-bazel.patch"],
+    path = "github.com/wharflab/tree-sitter-powershell",
+)
+use_repo(go_deps, "cc_mvdan_sh_v3", "com_github_armon_circbuf", "com_github_bluekeyes_go_gitdiff", "com_github_bmatcuk_doublestar_v4", "com_github_cenkalti_backoff_v5", "com_github_coder_acp_go_sdk", "com_github_compose_spec_compose_go_v2", "com_github_containerd_platforms", "com_github_distribution_reference", "com_github_docker_buildx", "com_github_docker_cli", "com_github_docker_distribution", "com_github_editorconfig_editorconfig_core_go_v2", "com_github_gkampitakis_ciinfo", "com_github_gkampitakis_go_snaps", "com_github_google_go_containerregistry", "com_github_google_jsonschema_go", "com_github_knadh_koanf_parsers_toml_v2", "com_github_knadh_koanf_providers_confmap", "com_github_knadh_koanf_providers_env_v2", "com_github_knadh_koanf_providers_file", "com_github_knadh_koanf_providers_posflag", "com_github_knadh_koanf_providers_structs", "com_github_knadh_koanf_v2", "com_github_masterminds_semver_v3", "com_github_mattn_go_isatty", "com_github_moby_buildkit", "com_github_moby_docker_image_spec", "com_github_moby_patternmatcher", "com_github_muesli_termenv", "com_github_opencontainers_go_digest", "com_github_opencontainers_image_spec", "com_github_owenrumney_go_sarif_v3", "com_github_pelletier_go_toml_v2", "com_github_sirupsen_logrus", "com_github_spf13_cobra", "com_github_spf13_pflag", "com_github_stretchr_testify", "com_github_tetratelabs_wazero", "com_github_tree_sitter_go_tree_sitter", "com_github_wharflab_tree_sitter_batch", "com_github_wharflab_tree_sitter_powershell", "com_github_zricethezav_gitleaks_v8", "in_gopkg_ini_v1", "in_yaml_go_yaml_v4", "io_opentelemetry_go_otel", "io_podman_go_image_v5", "land_charm_bubbles_v2", "land_charm_lipgloss_v2", "org_golang_x_exp_jsonrpc2", "org_golang_x_sys", "st_bug_go_lsp")
+
+go_tool_deps = use_extension("@gazelle//:extensions.bzl", "go_deps", isolate = True)
+go_tool_deps.from_file(go_mod = "//_tools:go.mod")
+use_repo(go_tool_deps, "com_github_atombender_go_jsonschema", "com_github_golangci_plugin_module_register", "org_golang_x_tools")
+
+bun_ext = use_extension("@rules_bun//bun:extensions.bzl", "bun")
+use_repo(
+    bun_ext,
+    "bun_darwin_aarch64",
+    "bun_darwin_x64",
+    "bun_linux_aarch64",
+    "bun_linux_aarch64_musl",
+    "bun_linux_x64",
+    "bun_linux_x64_musl",
+    "bun_windows_aarch64",
+    "bun_windows_x64",
+)
+
+register_toolchains(
+    "@rules_bun//bun:darwin_aarch64_toolchain",
+    "@rules_bun//bun:darwin_x64_toolchain",
+    "@rules_bun//bun:linux_aarch64_toolchain",
+    "@rules_bun//bun:linux_x64_toolchain",
+    "@rules_bun//bun:windows_x64_toolchain",
+)
+
+bun_install_ext = use_extension("@rules_bun//bun:extensions.bzl", "bun_install")
+bun_install_ext.install(
+    name = "vscode_tally_bun_deps",
+    bun_lockfile = "//_integrations/vscode-tally:bun.lock",
+    package_json = "//_integrations/vscode-tally:package.json",
+)
+use_repo(bun_install_ext, "vscode_tally_bun_deps")
+
+rules_kotlin_extensions = use_extension(
+    "@rules_kotlin//src/main/starlark/core/repositories:bzlmod_setup.bzl",
+    "rules_kotlin_extensions",
+)
+rules_kotlin_extensions.kotlinc_version(
+    sha256 = "a623871f1cd9c938946948b70ef9170879f0758043885bbd30c32f024e511714",
+    version = "2.2.21",
+)
+use_repo(
+    rules_kotlin_extensions,
+    "com_github_google_ksp",
+    "com_github_jetbrains_kotlin",
+    "com_github_jetbrains_kotlin_git",
+    "com_github_pinterest_ktlint",
+    "kotlin_build_tools_impl",
+    "kotlinx_coroutines_core_jvm",
+    "kotlinx_serialization_core_jvm",
+    "kotlinx_serialization_json",
+    "kotlinx_serialization_json_jvm",
+)
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "buildkit_source",
+    build_file = "//third_party:buildkit_source.BUILD.bazel",
+    sha256 = "8308c61f71b42e00b24a3233b7ceeb4d0e6cb7e1a248bd23fba2bb69c952cc5b",
+    strip_prefix = "github.com/moby/buildkit@v0.30.0",
+    urls = ["https://proxy.golang.org/github.com/moby/buildkit/@v/v0.30.0.zip"],
+)
+
+http_archive(
+    name = "intellij_webstorm_sdk",
+    build_file = "//_integrations/intellij-tally:WebStorm.BUILD.bazel",
+    sha256 = "00c82eded289fbd6fdb170314b4402d508175dffcbe1d7ffcc8370da6b400e71",
+    strip_prefix = "WebStorm-252.26830.93",
+    urls = ["https://download.jetbrains.com/webstorm/WebStorm-2025.2.3.tar.gz"],
+)
+
+pull = use_repo_rule("@rules_img//img:pull.bzl", "pull")
+
+pull(
+    name = "distroless_base_debian12_nonroot",
+    digest = "sha256:956eee19d77039968b05209dce21e43c84fb2bae7644a2b0546b36996c96e305",
+    registry = "gcr.io",
+    repository = "distroless/base-debian12",
+    tag = "nonroot",
+)
+
+rules_rust = use_extension("@rules_rs//rs/experimental:rules_rust.bzl", "rules_rust")
+rules_rust.patch(
+    patches = ["//patches:rules-rust-wasm-build-script-linker.patch"],
+    strip = 1,
+)
+use_repo(rules_rust, "rules_rust")
+
+rust_toolchains = use_extension(
+    "@rules_rs//rs/experimental/toolchains:module_extension.bzl",
+    "toolchains",
+)
+rust_toolchains.toolchain(
+    edition = "2021",
+    version = "1.89.0",
+)
+use_repo(rust_toolchains, "default_rust_toolchains")
+
+register_toolchains("@default_rust_toolchains//:all")
+
+crate = use_extension("@rules_rs//rs:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "zed_tally_crates",
+    cargo_lock = "//_integrations/zed-tally:Cargo.lock",
+    cargo_toml = "//_integrations/zed-tally:Cargo.toml",
+    platform_triples = [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "wasm32-wasip2",
+        "x86_64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+    ],
+    use_experimental_platforms = True,
+)
+use_repo(crate, "zed_tally_crates")

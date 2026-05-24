@@ -1,0 +1,27 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["testutil.go"],
+    importpath = "github.com/wharflab/tally/internal/testutil",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/directive:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/facts:go_default_library",
+        "//internal/invocation:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/sourcemap:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["testutil_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/rules:go_default_library",
+        "//internal/shell:go_default_library",
+    ],
+)

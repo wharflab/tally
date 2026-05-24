@@ -1,0 +1,44 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "sc1040.go",
+        "script.go",
+        "shellcheck.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/rules/shellcheck",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/directive:go_default_library",
+        "//internal/highlight/extract:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/shell:go_default_library",
+        "//internal/shellcheck:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@cc_mvdan_sh_v3//syntax:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/command:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "sc1040_test.go",
+        "shellcheck_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/directive:go_default_library",
+        "//internal/dockerfile:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/semantic:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "//internal/testutil:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/instructions:go_default_library",
+        "@com_github_moby_buildkit//frontend/dockerfile/parser:go_default_library",
+    ],
+)

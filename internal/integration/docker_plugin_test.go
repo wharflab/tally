@@ -18,7 +18,7 @@ func TestDockerCLIPluginMetadata(t *testing.T) {
 
 	pluginPath := dockerPluginPath(t)
 	cmd := exec.Command(pluginPath, metadata.MetadataSubcommandName)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("metadata command failed: %v\noutput:\n%s", err, output)
@@ -54,7 +54,7 @@ func TestDockerCLIPluginLintCommand(t *testing.T) {
 	}
 
 	cmd := exec.Command(pluginPath, "lint", "--config", configPath, "--format", "json", "--ignore", "*", dockerfilePath)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("plugin lint failed: %v\noutput:\n%s", err, output)
@@ -69,7 +69,7 @@ func TestDockerCLIPluginVersionFlag(t *testing.T) {
 
 	pluginPath := dockerPluginPath(t)
 	cmd := exec.Command(pluginPath, "lint", "--version")
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("plugin version failed: %v\noutput:\n%s", err, output)
@@ -106,7 +106,7 @@ func TestDockerCLIPluginSeparatesDockerAndTallyConfigFlags(t *testing.T) {
 		"--ignore", "*",
 		dockerfilePath,
 	)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	cmd.Env = integrationCommandEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("plugin lint with Docker global --config failed: %v\noutput:\n%s", err, output)

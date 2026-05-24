@@ -1,0 +1,41 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "github_actions.go",
+        "json.go",
+        "markdown.go",
+        "reporter.go",
+        "sarif.go",
+        "text.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/reporter",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/highlight:go_default_library",
+        "//internal/highlight/core:go_default_library",
+        "//internal/highlight/renderansi:go_default_library",
+        "//internal/highlight/theme:go_default_library",
+        "//internal/invocation:go_default_library",
+        "//internal/rules:go_default_library",
+        "//internal/sourcemap:go_default_library",
+        "@com_github_muesli_termenv//:go_default_library",
+        "@com_github_owenrumney_go_sarif_v3//pkg/report/v210/sarif:go_default_library",
+        "@land_charm_lipgloss_v2//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "github_actions_test.go",
+        "json_test.go",
+        "markdown_test.go",
+        "reporter_test.go",
+        "sarif_test.go",
+        "text_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = ["//internal/rules:go_default_library"],
+)

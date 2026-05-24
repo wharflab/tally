@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["all.go"],
+    importpath = "github.com/wharflab/tally/internal/rules/all",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/rules/buildkit:go_default_library",
+        "//internal/rules/hadolint:go_default_library",
+        "//internal/rules/powershell:go_default_library",
+        "//internal/rules/shellcheck:go_default_library",
+        "//internal/rules/tally:go_default_library",
+        "//internal/rules/tally/gpu:go_default_library",
+        "//internal/rules/tally/js:go_default_library",
+        "//internal/rules/tally/labels:go_default_library",
+        "//internal/rules/tally/php:go_default_library",
+        "//internal/rules/tally/powershell:go_default_library",
+        "//internal/rules/tally/ruby:go_default_library",
+        "//internal/rules/tally/windows:go_default_library",
+    ],
+)

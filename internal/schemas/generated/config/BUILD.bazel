@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["tally_config.gen.go"],
+    importpath = "github.com/wharflab/tally/internal/schemas/generated/config",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/schemas/generated/rules/hadolint:go_default_library",
+        "//internal/schemas/generated/rules/ruleschema:go_default_library",
+        "//internal/schemas/generated/rules/tally:go_default_library",
+        "//internal/schemas/generated/rules/tally/labels:go_default_library",
+    ],
+)

@@ -125,14 +125,23 @@ local postMergeSteps = new Mapping<String, Step> {
 }
 
 local prePushSteps = new Mapping<String, Step> {
+  ["shellcheck-wasm"] {
+    check =
+      "test -s internal/shellcheck/wasm/shellcheck.wasm || (echo \"internal/shellcheck/wasm/shellcheck.wasm is missing. Run 'make shellcheck-wasm' (Bazel-backed, requires Docker) to build it, or download the artifact from a recent CI run.\"; exit 1)"
+  }
   ["build"] {
-    check = "make build"
+    check =
+      "version=\"${TALLY_VERSION:-0.0.0-dev}\"; bazel build --config=release --embed_label=\"$version\" //:tally"
+    depends = List("shellcheck-wasm")
   }
   ["deadcode"] {
-    check = "make deadcode"
+    check =
+      "tmp=$(mktemp); go run golang.org/x/tools/cmd/deadcode@v0.41.0 -test ./... 2>&1 | grep -v 'internal/lsp/protocol/' >\"$tmp\" || true; if [ -s \"$tmp\" ]; then cat \"$tmp\"; rm \"$tmp\"; exit 1; fi; rm \"$tmp\""
+    depends = List("shellcheck-wasm")
   }
   ["test"] {
-    check = "make test"
+    check = "bazel test --config=go --config=race //cmd/... //internal/... //_tools/..."
+    depends = List("shellcheck-wasm")
   }
   ["mintlify-docs-broken-links"] {
     dir = "_docs"

@@ -1,0 +1,36 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "bake.go",
+        "compose.go",
+        "context.go",
+        "helpers.go",
+        "model.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/invocation",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@com_github_compose_spec_compose_go_v2//cli:go_default_library",
+        "@com_github_compose_spec_compose_go_v2//types:go_default_library",
+        "@com_github_containerd_platforms//:go_default_library",
+        "@com_github_docker_buildx//bake:go_default_library",
+        "@com_github_docker_buildx//util/buildflags:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "bake_test.go",
+        "compose_test.go",
+        "context_test.go",
+        "helpers_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "@com_github_compose_spec_compose_go_v2//types:go_default_library",
+        "@com_github_docker_buildx//util/buildflags:go_default_library",
+    ],
+)

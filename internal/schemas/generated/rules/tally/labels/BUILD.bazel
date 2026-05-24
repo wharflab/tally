@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["no_buildx_git_overlap.gen.go"],
+    importpath = "github.com/wharflab/tally/internal/schemas/generated/rules/tally/labels",
+    visibility = ["//:__subpackages__"],
+    deps = ["//internal/schemas/generated/rules/ruleschema:go_default_library"],
+)

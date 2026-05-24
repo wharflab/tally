@@ -2,6 +2,7 @@ package lspserver
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -84,7 +85,9 @@ func TestDidChangeConfigurationDiagnosticRefreshIgnoresCanceledContext(t *testin
 	require.NoError(t, client.Call(ctx, string(protocol.MethodShutdown), nil).Await(ctx, &shutdownResult))
 
 	t.Cleanup(func() {
-		require.NoError(t, client.Close())
+		if err := client.Close(); err != nil && !errors.Is(err, context.Canceled) {
+			require.NoError(t, err)
+		}
 		require.NoError(t, listener.Close())
 		if err := server.Wait(); err != nil {
 			t.Logf("jsonrpc2 server wait: %v", err)

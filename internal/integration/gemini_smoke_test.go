@@ -199,9 +199,7 @@ func runGeminiSmoke(t *testing.T, cfg geminiSmokeRunConfig) (string, []byte, str
 	args = append(args, dockerfilePath)
 
 	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(),
-		"GOCOVERDIR="+coverageDir,
-	)
+	cmd.Env = integrationCommandEnv()
 
 	outputBytes, runErr := cmd.CombinedOutput()
 	_ = runErr // tally exits non-zero when unresolved violations remain.

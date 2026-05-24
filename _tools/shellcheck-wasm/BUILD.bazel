@@ -1,0 +1,85 @@
+load("@rules_img//img:image.bzl", "image_manifest")
+load("@rules_img//img:layer.bzl", "file_metadata", "image_layer")
+load("@rules_img//img:load.bzl", "image_load")
+
+exports_files(
+    ["Dockerfile"],
+    visibility = ["//visibility:public"],
+)
+
+SHELLCHECK_WASM_SRCS = [
+    "Dockerfile",
+    "Reactor.hs",
+    "versions.env",
+] + glob(["rewrites/*.yml"])
+
+genrule(
+    name = "shellcheck_wasm",
+    srcs = SHELLCHECK_WASM_SRCS,
+    outs = ["shellcheck.wasm"],
+    cmd_bash = """
+set -euo pipefail
+set -a
+. "$(location versions.env)"
+set +a
+
+out_dir="$$(mktemp -d)"
+trap 'rm -rf "$$out_dir"' EXIT
+context_dir="$$(dirname "$(location Dockerfile)")"
+
+cache_args=""
+if [ "$${TALLY_SHELLCHECK_WASM_GHA_CACHE:-}" = "1" ]; then
+  cache_args="--cache-from type=gha,scope=shellcheck-wasm --cache-to type=gha,mode=max,scope=shellcheck-wasm"
+fi
+
+docker buildx build \\
+  --progress=plain \\
+  --build-arg "GHC_WASM_META_COMMIT=$${GHC_WASM_META_COMMIT}" \\
+  --build-arg "SHELLCHECK_VERSION=$${SHELLCHECK_VERSION#v}" \\
+  --build-arg "AST_GREP_VERSION=$${AST_GREP_VERSION}" \\
+  $$cache_args \\
+  --output "type=local,dest=$$out_dir" \\
+  -f "$(location Dockerfile)" \\
+  "$$context_dir"
+
+test -s "$$out_dir/shellcheck.wasm"
+cp "$$out_dir/shellcheck.wasm" "$@"
+""",
+    tags = [
+        "manual",
+        "no-remote-exec",
+        "no-sandbox",
+        "requires-docker",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+image_layer(
+    name = "shellcheck_wasm_layer",
+    srcs = {
+        "/shellcheck.wasm": ":shellcheck_wasm",
+    },
+    default_metadata = file_metadata(
+        gid = 0,
+        mode = "0644",
+        uid = 0,
+    ),
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+image_manifest(
+    name = "shellcheck_wasm_image",
+    layers = [":shellcheck_wasm_layer"],
+    platform = "@rules_img//img/private/platforms:linux_amd64",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+image_load(
+    name = "load_shellcheck_wasm_image",
+    image = ":shellcheck_wasm_image",
+    tag = "tally-shellcheck-wasm:latest",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)

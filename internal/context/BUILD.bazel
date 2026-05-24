@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "context.go",
+        "dockerignore.go",
+    ],
+    importpath = "github.com/wharflab/tally/internal/context",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@com_github_moby_patternmatcher//:go_default_library",
+        "@com_github_moby_patternmatcher//ignorefile:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["context_test.go"],
+    embed = [":go_default_library"],
+)
