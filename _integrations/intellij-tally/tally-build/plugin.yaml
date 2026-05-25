@@ -1,0 +1,60 @@
+---
+tasks:
+  packagePlugin:
+    action: !io.github.wharflab.tally.toolchain.packagePlugin
+      # ${module.jar} = the compiled module jar (classes + resources). The
+      # task copies this to <pluginName>/lib/, templating META-INF/plugin.xml
+      # in the process.
+      moduleJar: ${module.jar}
+      bundledDir: ${project.rootDir}/intellij-plugin/bundled
+      pluginId: ${pluginSettings.pluginId}
+      pluginName: ${pluginSettings.pluginName}
+      pluginVersion: ${pluginSettings.pluginVersion}
+      sinceBuild: ${pluginSettings.pluginSinceBuild}
+      untilBuild: ${pluginSettings.pluginUntilBuild}
+      stagingDir: ${taskOutputDir}/package
+      distDir: ${project.rootDir}/dist
+  downloadIde:
+    action: !io.github.wharflab.tally.toolchain.downloadAndExtract
+      url: ${pluginSettings.ideArchiveUrl}
+      sha256: ${pluginSettings.ideArchiveSha256}
+      destination: ${taskOutputDir}/ide
+  verifyPlugin:
+    action: !io.github.wharflab.tally.toolchain.runPluginVerifier
+      verifierUrl: ${pluginSettings.pluginVerifierUrl}
+      ideHome: ${tasks.downloadIde.action.destination}
+      pluginZipDir: ${tasks.packagePlugin.action.distDir}
+      pluginVersion: ${pluginSettings.pluginVersion}
+      reportsDir: ${taskOutputDir}/reports
+      enforceCommunityRules: false
+  smokePlugin:
+    action: !io.github.wharflab.tally.toolchain.runPluginVerifier
+      verifierUrl: ${pluginSettings.pluginVerifierUrl}
+      ideHome: ${tasks.downloadIde.action.destination}
+      pluginZipDir: ${tasks.packagePlugin.action.distDir}
+      pluginVersion: ${pluginSettings.pluginVersion}
+      reportsDir: ${taskOutputDir}/reports
+      enforceCommunityRules: true
+  ktlintCheck:
+    action: !io.github.wharflab.tally.toolchain.runKtlint
+      ktlintVersion: ${pluginSettings.ktlintVersion}
+      sourcesDir: ${project.rootDir}/intellij-plugin/src
+      cacheDir: ${taskOutputDir}/ktlint
+      format: false
+  ktlintFormat:
+    action: !io.github.wharflab.tally.toolchain.runKtlint
+      ktlintVersion: ${pluginSettings.ktlintVersion}
+      sourcesDir: ${project.rootDir}/intellij-plugin/src
+      cacheDir: ${taskOutputDir}/ktlint
+      format: true
+commands:
+  - name: build
+    performedBy: packagePlugin
+  - name: verify
+    performedBy: verifyPlugin
+  - name: smoke
+    performedBy: smokePlugin
+  - name: ktlint
+    performedBy: ktlintCheck
+  - name: ktlintFix
+    performedBy: ktlintFormat

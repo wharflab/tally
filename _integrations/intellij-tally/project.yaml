@@ -1,0 +1,6 @@
+---
+modules:
+  - ./intellij-plugin
+  - ./tally-build
+plugins:
+  - ./tally-build

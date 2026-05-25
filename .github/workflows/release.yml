@@ -944,19 +944,14 @@ jobs:
       - name: Set IntelliJ plugin version from tag
         run: |
           CLEAN_VERSION="${VERSION#v}"
-          VERSIONS_TOML="_integrations/intellij-tally/build/versions.toml"
-          sed -i -E "s/^plugin_version = \".*\"/plugin_version = \"${CLEAN_VERSION}\"/" \
-            "${VERSIONS_TOML}"
-          if command -v taplo >/dev/null 2>&1; then
-            ACTUAL_VERSION="$(taplo get -f "${VERSIONS_TOML}" --strip-newline plugin_version || true)"
-            if [ "${ACTUAL_VERSION}" != "${CLEAN_VERSION}" ]; then
-              echo "::error::Failed to set plugin_version in versions.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL_VERSION})"
-              exit 1
-            fi
-          else
-            grep -qE "^plugin_version = \"${CLEAN_VERSION}\"$" "${VERSIONS_TOML}" \
-              || { echo "::error::Failed to set plugin_version in versions.toml"; exit 1; }
-          fi
+          MODULE_YAML="_integrations/intellij-tally/intellij-plugin/module.yaml"
+          # The pluginVersion line is the only key with this exact prefix; a
+          # leading-space match is sufficient and keeps us out of YAML parser
+          # territory in CI shell.
+          sed -i -E "s/^([[:space:]]+pluginVersion: ).*/\1${CLEAN_VERSION}/" \
+            "${MODULE_YAML}"
+          grep -qE "^[[:space:]]+pluginVersion: ${CLEAN_VERSION}$" "${MODULE_YAML}" \
+            || { echo "::error::Failed to set pluginVersion in ${MODULE_YAML}"; exit 1; }
       - name: Build IntelliJ plugin
         run: make intellij-plugin
       - name: IntelliJ Community smoke check
@@ -1028,9 +1023,9 @@ jobs:
             exit 1
           fi
 
-          XML_ID="$(grep -E '^plugin_id[[:space:]]*=' _integrations/intellij-tally/build/versions.toml | head -n 1 | sed -E 's/^[^=]*=[[:space:]]*\"([^\"]+)\".*/\1/')"
+          XML_ID="$(grep -E '^[[:space:]]+pluginId:' _integrations/intellij-tally/intellij-plugin/module.yaml | head -n 1 | sed -E 's/^[[:space:]]+pluginId:[[:space:]]+//; s/[[:space:]]+$//')"
           if [ -z "${XML_ID}" ]; then
-            echo "::error::Unable to resolve plugin_id from versions.toml."
+            echo "::error::Unable to resolve pluginId from intellij-plugin/module.yaml."
             exit 1
           fi
 

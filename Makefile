@@ -1,4 +1,4 @@
-.PHONY: build check-shellcheck-wasm intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin shellcheck-wasm update-shellcheck-wasm
+.PHONY: build check-shellcheck-wasm intellij-plugin intellij-plugin-verify intellij-plugin-smoke intellij-plugin-ktlint intellij-plugin-ktlint-fix test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin shellcheck-wasm update-shellcheck-wasm
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
@@ -27,14 +27,28 @@ check-shellcheck-wasm:
 		exit 1; \
 	fi
 
+# IntelliJ plugin targets delegate to the Kotlin Toolchain. The wrapper script
+# (_integrations/intellij-tally/kotlin) provisions Kotlin Toolchain v0.11.0 on
+# first run and caches it under $HOME; subsequent invocations are quick. Tasks
+# (downloadIde, compilePlugin, packagePlugin, verifyPlugin, smokePlugin) are
+# defined as a custom Amper plugin in _integrations/intellij-tally/tally-build/.
+INTELLIJ_KOTLIN := _integrations/intellij-tally/kotlin
+INTELLIJ_KOTLIN_ENV := KOTLIN_CLI_NO_WELCOME_BANNER=1
+
 intellij-plugin:
-	bash _integrations/intellij-tally/build/build.sh build
+	cd _integrations/intellij-tally && $(INTELLIJ_KOTLIN_ENV) ./kotlin do build
 
 intellij-plugin-verify:
-	bash _integrations/intellij-tally/build/build.sh verify
+	cd _integrations/intellij-tally && $(INTELLIJ_KOTLIN_ENV) ./kotlin do verify
 
 intellij-plugin-smoke:
-	bash _integrations/intellij-tally/build/smoke.sh
+	cd _integrations/intellij-tally && $(INTELLIJ_KOTLIN_ENV) ./kotlin do smoke
+
+intellij-plugin-ktlint:
+	cd _integrations/intellij-tally && $(INTELLIJ_KOTLIN_ENV) ./kotlin do ktlint
+
+intellij-plugin-ktlint-fix:
+	cd _integrations/intellij-tally && $(INTELLIJ_KOTLIN_ENV) ./kotlin do ktlintFix
 
 GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := $(shell cat .golangci-lint-version | tr -d '[:space:]')

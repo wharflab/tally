@@ -61,8 +61,10 @@ exclude-files.txt
 node_modules/
 package-lock.json
 *.vsix
-_integrations/intellij-tally/.cache/
-_integrations/intellij-tally/out/
+# Kotlin Toolchain build directory (replaces the legacy bash .cache/out/dist
+# layout). dist/ holds the published plugin zip; build/ is all transient
+# state — Amper task outputs, downloaded toolchains, logs, incremental state.
+_integrations/intellij-tally/build/
 _integrations/intellij-tally/dist/
 _integrations/zed-tally/target/
 verification-*/
