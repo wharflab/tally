@@ -132,6 +132,13 @@ local prePushSteps = new Mapping<String, Step> {
     check = "make deadcode"
   }
   ["test"] {
+    // gotestsum's `pkgname` format only prints one line per package, keeping
+    // hk's stderr pipe small enough to avoid the EAGAIN panic the runner hits
+    // when many tests log in parallel. Use `make test-verbose` locally for
+    // per-test output.
+    env {
+      ["GOTESTSUM_FORMAT"] = "pkgname"
+    }
     check = "make test"
   }
   ["mintlify-docs-broken-links"] {
