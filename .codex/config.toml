@@ -2,5 +2,6 @@
 inherit = "core"
 
 [shell_environment_policy.set]
-GH_PAGER     = "cat"
-GOEXPERIMENT = "jsonv2"
+GH_PAGER                     = "cat"
+GOEXPERIMENT                 = "jsonv2"
+KOTLIN_CLI_NO_WELCOME_BANNER = "1"

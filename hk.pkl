@@ -7,6 +7,7 @@ import "package://github.com/jdx/hk/releases/download/v1.44.2/hk@1.44.2#/Builtin
 
 env {
   ["GOEXPERIMENT"] = "jsonv2"
+  ["KOTLIN_CLI_NO_WELCOME_BANNER"] = "1"
 }
 
 local preCommitSteps = new Mapping<String, Step> {
