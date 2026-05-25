@@ -52,7 +52,7 @@ require (
 	go.podman.io/image/v5 v5.40.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
-	golang.org/x/sys v0.44.0
+	golang.org/x/sys v0.45.0
 	gopkg.in/ini.v1 v1.67.2
 	mvdan.cc/sh/v3 v3.13.1
 )
