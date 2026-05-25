@@ -1,37 +1,32 @@
 package io.github.wharflab.tally.toolchain
 
+import org.jetbrains.amper.plugins.ExecutionAvoidance
 import org.jetbrains.amper.plugins.Input
 import org.jetbrains.amper.plugins.Output
 import org.jetbrains.amper.plugins.TaskAction
-import java.net.URI
-import java.nio.file.attribute.PosixFilePermissions
-import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
-import kotlin.io.path.exists
-import kotlin.io.path.outputStream
-import kotlin.io.path.setPosixFilePermissions
 
-@TaskAction(executionAvoidance = org.jetbrains.amper.plugins.ExecutionAvoidance.Disabled)
+@TaskAction(executionAvoidance = ExecutionAvoidance.Disabled)
 fun runKtlint(
     ktlintVersion: String,
+    ktlintSha256: String,
     @Input sourcesDir: Path,
     @Output cacheDir: Path,
     format: Boolean,
 ) {
     cacheDir.createDirectories()
-    val binary = cacheDir.resolve("ktlint-$ktlintVersion")
-    if (!binary.exists()) {
-        val url = "https://github.com/pinterest/ktlint/releases/download/$ktlintVersion/ktlint"
-        println("downloading $url")
-        URI.create(url).toURL().openStream().use { input ->
-            binary.outputStream().use { input.copyTo(it) }
-        }
-        runCatching {
-            binary.setPosixFilePermissions(PosixFilePermissions.fromString("rwxr-xr-x"))
-        }
-    }
+    // ktlint releases ship a self-executable jar (the leading bash shim is a
+    // launcher), so `java -jar` works on every platform — no chmod, no
+    // platform-specific exec bits, and no Windows-vs-shebang trouble.
+    val binary = cacheDir.resolve("ktlint-$ktlintVersion.jar")
+    val url = "https://github.com/pinterest/ktlint/releases/download/$ktlintVersion/ktlint"
+    downloadWithSha(url, binary, ktlintSha256)
+
+    val javaBin = ProcessHandle.current().info().command().orElse("java")
     val args = buildList {
+        add(javaBin)
+        add("-jar")
         add(binary.toString())
         if (format) add("--format")
         add(sourcesDir.toString())

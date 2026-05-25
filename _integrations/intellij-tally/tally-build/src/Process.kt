@@ -1,13 +1,21 @@
 package io.github.wharflab.tally.toolchain
 
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
+
+private val PROCESS_TIMEOUT_MINUTES = 30L
 
 internal fun runProcess(vararg command: String) {
     val process = ProcessBuilder(*command)
         .redirectOutput(ProcessBuilder.Redirect.INHERIT)
         .redirectError(ProcessBuilder.Redirect.INHERIT)
         .start()
-    val exit = process.waitFor()
+    val finished = process.waitFor(PROCESS_TIMEOUT_MINUTES, TimeUnit.MINUTES)
+    if (!finished) {
+        process.destroyForcibly()
+        error("command timed out after ${PROCESS_TIMEOUT_MINUTES}m: ${command.joinToString(" ")}")
+    }
+    val exit = process.exitValue()
     check(exit == 0) {
         "command failed (exit=$exit): ${command.joinToString(" ")}"
     }

@@ -30,9 +30,10 @@ check-shellcheck-wasm:
 # IntelliJ plugin targets delegate to the Kotlin Toolchain. The wrapper script
 # (_integrations/intellij-tally/kotlin) provisions Kotlin Toolchain v0.11.0 on
 # first run and caches it under $HOME; subsequent invocations are quick. Tasks
-# (downloadIde, compilePlugin, packagePlugin, verifyPlugin, smokePlugin) are
+# (packagePlugin, verifyPlugin, smokePlugin, ktlintCheck, ktlintFormat) are
 # defined as a custom Amper plugin in _integrations/intellij-tally/tally-build/.
-INTELLIJ_KOTLIN := _integrations/intellij-tally/kotlin
+# All targets cd into the integration dir so ./kotlin discovers project.yaml
+# correctly; the env var disables the wrapper's first-run welcome banner.
 INTELLIJ_KOTLIN_ENV := KOTLIN_CLI_NO_WELCOME_BANNER=1
 
 intellij-plugin:

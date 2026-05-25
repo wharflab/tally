@@ -1,5 +1,7 @@
 package io.github.wharflab.tally.toolchain
 
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.jetbrains.amper.plugins.CompilationArtifact
 import org.jetbrains.amper.plugins.Input
 import org.jetbrains.amper.plugins.Output
@@ -8,8 +10,8 @@ import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
+import java.nio.file.attribute.PosixFileAttributeView
+import java.nio.file.attribute.PosixFilePermission
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.PathWalkOption
 import kotlin.io.path.copyToRecursively
@@ -77,25 +79,54 @@ fun packagePlugin(
     println("built plugin zip: $zip")
 }
 
+/**
+ * Build a zip from [source] preserving Unix permission bits (the IntelliJ
+ * Marketplace and most extractors honor the external-attributes field that
+ * commons-compress writes; `java.util.zip.ZipOutputStream` does not). Files
+ * with no POSIX view (Windows hosts) fall back to `0644`/`0755` based on
+ * directory-vs-file.
+ */
 @OptIn(ExperimentalPathApi::class)
 private fun zipDirectory(source: Path, target: Path) {
-    ZipOutputStream(target.outputStream().buffered()).use { zout ->
+    ZipArchiveOutputStream(target.outputStream().buffered()).use { zout ->
         source.walk(PathWalkOption.INCLUDE_DIRECTORIES)
             .filter { it != source }
             .sortedBy { it.relativeTo(source).toString() }
             .forEach { path ->
                 val rel = path.relativeTo(source).toString().replace(java.io.File.separatorChar, '/')
-                if (path.isDirectory()) {
-                    zout.putNextEntry(ZipEntry("$rel/"))
-                    zout.closeEntry()
-                } else {
-                    zout.putNextEntry(ZipEntry(rel))
-                    Files.newInputStream(path).use { it.copyTo(zout) }
-                    zout.closeEntry()
+                val isDir = path.isDirectory()
+                val entryName = if (isDir) "$rel/" else rel
+                val entry = ZipArchiveEntry(entryName).apply {
+                    unixMode = unixModeFor(path, isDir)
                 }
+                zout.putArchiveEntry(entry)
+                if (!isDir) Files.newInputStream(path).use { it.copyTo(zout) }
+                zout.closeArchiveEntry()
             }
     }
 }
+
+private fun unixModeFor(path: Path, isDir: Boolean): Int {
+    val view = Files.getFileAttributeView(path, PosixFileAttributeView::class.java)
+    if (view != null) {
+        runCatching {
+            return view.readAttributes().permissions().fold(0) { acc, p -> acc or POSIX_BIT[p]!! }
+        }
+    }
+    return if (isDir) 0b111_101_101 else 0b110_100_100  // 0755 / 0644
+}
+
+private val POSIX_BIT: Map<PosixFilePermission, Int> = mapOf(
+    PosixFilePermission.OWNER_READ to 0x100,
+    PosixFilePermission.OWNER_WRITE to 0x080,
+    PosixFilePermission.OWNER_EXECUTE to 0x040,
+    PosixFilePermission.GROUP_READ to 0x020,
+    PosixFilePermission.GROUP_WRITE to 0x010,
+    PosixFilePermission.GROUP_EXECUTE to 0x008,
+    PosixFilePermission.OTHERS_READ to 0x004,
+    PosixFilePermission.OTHERS_WRITE to 0x002,
+    PosixFilePermission.OTHERS_EXECUTE to 0x001,
+)
 
 /**
  * Copy [sourceJar] to [targetJar] verbatim, then patch the contained

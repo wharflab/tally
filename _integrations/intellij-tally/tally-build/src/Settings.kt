@@ -19,6 +19,8 @@ interface TallyBuildSettings {
     val ideArchiveSha256: String
 
     val pluginVerifierUrl: String
+    val pluginVerifierSha256: String
 
     val ktlintVersion: String
+    val ktlintSha256: String
 }

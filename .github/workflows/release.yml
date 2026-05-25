@@ -1023,9 +1023,19 @@ jobs:
             exit 1
           fi
 
-          XML_ID="$(grep -E '^[[:space:]]+pluginId:' _integrations/intellij-tally/intellij-plugin/module.yaml | head -n 1 | sed -E 's/^[[:space:]]+pluginId:[[:space:]]+//; s/[[:space:]]+$//')"
+          # pluginId is nested under plugins.tally-build in module.yaml, so
+          # only one match is expected. Fail loud on zero or multiple matches
+          # to catch structural changes early instead of silently shipping the
+          # wrong id.
+          MODULE_YAML="_integrations/intellij-tally/intellij-plugin/module.yaml"
+          ID_COUNT="$(grep -cE '^[[:space:]]+pluginId:' "${MODULE_YAML}")"
+          if [ "${ID_COUNT}" -ne 1 ]; then
+            echo "::error::Expected exactly 1 pluginId entry in ${MODULE_YAML}, found ${ID_COUNT}."
+            exit 1
+          fi
+          XML_ID="$(grep -E '^[[:space:]]+pluginId:' "${MODULE_YAML}" | sed -E 's/^[[:space:]]+pluginId:[[:space:]]+//; s/[[:space:]]+$//')"
           if [ -z "${XML_ID}" ]; then
-            echo "::error::Unable to resolve pluginId from intellij-plugin/module.yaml."
+            echo "::error::Unable to resolve pluginId from ${MODULE_YAML}."
             exit 1
           fi
 

@@ -22,6 +22,7 @@ tasks:
   verifyPlugin:
     action: !io.github.wharflab.tally.toolchain.runPluginVerifier
       verifierUrl: ${pluginSettings.pluginVerifierUrl}
+      verifierSha256: ${pluginSettings.pluginVerifierSha256}
       ideHome: ${tasks.downloadIde.action.destination}
       pluginZipDir: ${tasks.packagePlugin.action.distDir}
       pluginVersion: ${pluginSettings.pluginVersion}
@@ -30,6 +31,7 @@ tasks:
   smokePlugin:
     action: !io.github.wharflab.tally.toolchain.runPluginVerifier
       verifierUrl: ${pluginSettings.pluginVerifierUrl}
+      verifierSha256: ${pluginSettings.pluginVerifierSha256}
       ideHome: ${tasks.downloadIde.action.destination}
       pluginZipDir: ${tasks.packagePlugin.action.distDir}
       pluginVersion: ${pluginSettings.pluginVersion}
@@ -38,12 +40,14 @@ tasks:
   ktlintCheck:
     action: !io.github.wharflab.tally.toolchain.runKtlint
       ktlintVersion: ${pluginSettings.ktlintVersion}
+      ktlintSha256: ${pluginSettings.ktlintSha256}
       sourcesDir: ${project.rootDir}/intellij-plugin/src
       cacheDir: ${taskOutputDir}/ktlint
       format: false
   ktlintFormat:
     action: !io.github.wharflab.tally.toolchain.runKtlint
       ktlintVersion: ${pluginSettings.ktlintVersion}
+      ktlintSha256: ${pluginSettings.ktlintSha256}
       sourcesDir: ${project.rootDir}/intellij-plugin/src
       cacheDir: ${taskOutputDir}/ktlint
       format: true
