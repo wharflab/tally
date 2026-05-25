@@ -40,13 +40,16 @@ func TestDebugHTTP(t *testing.T) {
 
 func TestDebugResolveECR(t *testing.T) {
 	t.Parallel()
+	if os.Getenv("TALLY_TEST_REGISTRY") == "" {
+		t.Skip("set TALLY_TEST_REGISTRY=1 to run real registry tests")
+	}
 	logrus.SetLevel(logrus.DebugLevel)
 	logrus.SetOutput(os.Stderr)
 
 	resolver := NewContainersResolverWithContext(&types.SystemContext{
 		DockerRegistryUserAgent:     "tally/test",
 		SystemRegistriesConfPath:    "/dev/null",
-		SystemRegistriesConfDirPath: "/dev/null",
+		SystemRegistriesConfDirPath: t.TempDir(),
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -76,7 +79,7 @@ func TestDebugResolveDockerHub(t *testing.T) {
 	resolver := NewContainersResolverWithContext(&types.SystemContext{
 		DockerRegistryUserAgent:     "tally/test",
 		SystemRegistriesConfPath:    "/dev/null",
-		SystemRegistriesConfDirPath: "/dev/null",
+		SystemRegistriesConfDirPath: t.TempDir(),
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

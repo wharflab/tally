@@ -40,8 +40,13 @@ GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := $(shell cat .golangci-lint-version | tr -d '[:space:]')
 DEADCODE_VERSION := v0.41.0
 
+# `pkgname` only prints one line per package; `testname` prints every test.
+# hk's pre-push runner overrides this to keep stderr small enough to avoid
+# the EAGAIN panic it hits when many tests log in parallel.
+GOTESTSUM_FORMAT ?= testname
+
 test: check-shellcheck-wasm bin/gotestsum-$(GOTESTSUM_VERSION)
-	bin/gotestsum-$(GOTESTSUM_VERSION) --format testname -- -tags '$(BUILDTAGS)' -race -count=1 -timeout=30s ./...
+	bin/gotestsum-$(GOTESTSUM_VERSION) --format $(GOTESTSUM_FORMAT) -- -tags '$(BUILDTAGS)' -race -count=1 -timeout=30s ./...
 
 test-verbose: check-shellcheck-wasm bin/gotestsum-$(GOTESTSUM_VERSION)
 	bin/gotestsum-$(GOTESTSUM_VERSION) --format standard-verbose -- -tags '$(BUILDTAGS)' -race -count=1 -timeout=30s ./...

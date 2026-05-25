@@ -185,7 +185,7 @@ func TestContainersResolver_MockRegistry_RegistriesConf(t *testing.T) {
 	// Create a resolver using the registries.conf redirect.
 	resolver := NewContainersResolverWithContext(&types.SystemContext{
 		SystemRegistriesConfPath:    confPath,
-		SystemRegistriesConfDirPath: "/dev/null",
+		SystemRegistriesConfDirPath: t.TempDir(),
 		DockerInsecureSkipTLSVerify: types.OptionalBoolTrue,
 	})
 
