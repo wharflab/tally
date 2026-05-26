@@ -39,15 +39,21 @@ fun runPluginVerifier(
     val ide = locateIdeRoot(ideHome)
     val log = taskRoot.resolve("verifier.log")
 
-    val process = ProcessBuilder(
+    val command = arrayOf(
         ProcessHandle.current().info().command().orElse("java"),
         "-jar", verifierJar.toString(),
         "check-plugin",
         "-verification-reports-dir", reportsDir.toString(),
         pluginZip.toString(),
         ide.toString(),
-    ).redirectErrorStream(true).redirectOutput(log.toFile()).start()
-    val exit = process.waitFor()
+    )
+    val process = ProcessBuilder(*command)
+        .redirectErrorStream(true)
+        .redirectOutput(log.toFile())
+        .start()
+    // Same 30-minute guard as runProcess(); without it a hung verifier would
+    // run until GitHub Actions kills the entire job.
+    val exit = waitWithTimeout(process, command)
 
     if (enforceCommunityRules) {
         enforceCommunityResult(log, exit)

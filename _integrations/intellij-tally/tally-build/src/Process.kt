@@ -10,15 +10,25 @@ internal fun runProcess(vararg command: String) {
         .redirectOutput(ProcessBuilder.Redirect.INHERIT)
         .redirectError(ProcessBuilder.Redirect.INHERIT)
         .start()
+    val exit = waitWithTimeout(process, command)
+    check(exit == 0) {
+        "command failed (exit=$exit): ${command.joinToString(" ")}"
+    }
+}
+
+/**
+ * Wait for [process] up to [PROCESS_TIMEOUT_MINUTES]; on timeout
+ * [Process.destroyForcibly] is called and the function throws. Returns the
+ * exit code on success. Use this from any caller that builds a `ProcessBuilder`
+ * directly (e.g. when output redirection rules out [runProcess]).
+ */
+internal fun waitWithTimeout(process: Process, command: Array<out String>): Int {
     val finished = process.waitFor(PROCESS_TIMEOUT_MINUTES, TimeUnit.MINUTES)
     if (!finished) {
         process.destroyForcibly()
         error("command timed out after ${PROCESS_TIMEOUT_MINUTES}m: ${command.joinToString(" ")}")
     }
-    val exit = process.exitValue()
-    check(exit == 0) {
-        "command failed (exit=$exit): ${command.joinToString(" ")}"
-    }
+    return process.exitValue()
 }
 
 /**
