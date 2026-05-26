@@ -6,7 +6,13 @@ tasks:
       # task copies this to <pluginName>/lib/, templating META-INF/plugin.xml
       # in the process.
       moduleJar: ${module.jar}
-      bundledDir: ${project.rootDir}/intellij-plugin/bundled
+      # The release workflow drops platform binaries into
+      # _integrations/intellij-tally/bundled/bin/<platform>/<arch>/ via the
+      # `Copy binaries into IntelliJ plugin bundle` step in release.yml.
+      # ${project.rootDir} resolves to _integrations/intellij-tally, so the
+      # path below matches what CI populates and lets the plugin's
+      # TallyBinaryResolver.resolveBundledBinary() find a runnable fallback.
+      bundledDir: ${project.rootDir}/bundled
       pluginId: ${pluginSettings.pluginId}
       pluginName: ${pluginSettings.pluginName}
       pluginVersion: ${pluginSettings.pluginVersion}
