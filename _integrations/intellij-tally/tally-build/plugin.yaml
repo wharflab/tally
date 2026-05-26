@@ -1,0 +1,70 @@
+---
+tasks:
+  packagePlugin:
+    action: !io.github.wharflab.tally.toolchain.packagePlugin
+      # ${module.jar} = the compiled module jar (classes + resources). The
+      # task copies this to <pluginName>/lib/, templating META-INF/plugin.xml
+      # in the process.
+      moduleJar: ${module.jar}
+      # The release workflow drops platform binaries into
+      # _integrations/intellij-tally/bundled/bin/<platform>/<arch>/ via the
+      # `Copy binaries into IntelliJ plugin bundle` step in release.yml.
+      # ${project.rootDir} resolves to _integrations/intellij-tally, so the
+      # path below matches what CI populates and lets the plugin's
+      # TallyBinaryResolver.resolveBundledBinary() find a runnable fallback.
+      bundledDir: ${project.rootDir}/bundled
+      pluginId: ${pluginSettings.pluginId}
+      pluginName: ${pluginSettings.pluginName}
+      pluginVersion: ${pluginSettings.pluginVersion}
+      sinceBuild: ${pluginSettings.pluginSinceBuild}
+      untilBuild: ${pluginSettings.pluginUntilBuild}
+      stagingDir: ${taskOutputDir}/package
+      distDir: ${project.rootDir}/dist
+  downloadIde:
+    action: !io.github.wharflab.tally.toolchain.downloadAndExtract
+      url: ${pluginSettings.ideArchiveUrl}
+      sha256: ${pluginSettings.ideArchiveSha256}
+      destination: ${taskOutputDir}/ide
+  verifyPlugin:
+    action: !io.github.wharflab.tally.toolchain.runPluginVerifier
+      verifierUrl: ${pluginSettings.pluginVerifierUrl}
+      verifierSha256: ${pluginSettings.pluginVerifierSha256}
+      ideHome: ${tasks.downloadIde.action.destination}
+      pluginZipDir: ${tasks.packagePlugin.action.distDir}
+      pluginVersion: ${pluginSettings.pluginVersion}
+      reportsDir: ${taskOutputDir}/reports
+      enforceCommunityRules: false
+  smokePlugin:
+    action: !io.github.wharflab.tally.toolchain.runPluginVerifier
+      verifierUrl: ${pluginSettings.pluginVerifierUrl}
+      verifierSha256: ${pluginSettings.pluginVerifierSha256}
+      ideHome: ${tasks.downloadIde.action.destination}
+      pluginZipDir: ${tasks.packagePlugin.action.distDir}
+      pluginVersion: ${pluginSettings.pluginVersion}
+      reportsDir: ${taskOutputDir}/reports
+      enforceCommunityRules: true
+  ktlintCheck:
+    action: !io.github.wharflab.tally.toolchain.runKtlint
+      ktlintVersion: ${pluginSettings.ktlintVersion}
+      ktlintSha256: ${pluginSettings.ktlintSha256}
+      sourcesDir: ${project.rootDir}/intellij-plugin/src
+      cacheDir: ${taskOutputDir}/ktlint
+      format: false
+  ktlintFormat:
+    action: !io.github.wharflab.tally.toolchain.runKtlint
+      ktlintVersion: ${pluginSettings.ktlintVersion}
+      ktlintSha256: ${pluginSettings.ktlintSha256}
+      sourcesDir: ${project.rootDir}/intellij-plugin/src
+      cacheDir: ${taskOutputDir}/ktlint
+      format: true
+commands:
+  - name: build
+    performedBy: packagePlugin
+  - name: verify
+    performedBy: verifyPlugin
+  - name: smoke
+    performedBy: smokePlugin
+  - name: ktlint
+    performedBy: ktlintCheck
+  - name: ktlintFix
+    performedBy: ktlintFormat

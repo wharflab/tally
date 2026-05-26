@@ -1,0 +1,57 @@
+---
+product: jvm/lib
+description: |
+  IntelliJ Platform plugin for Tally. Compiled natively by the Kotlin
+  Toolchain against the IntelliJ Platform Maven artifacts (build 253.x). The
+  tally-build plugin packages the resulting jar into the
+  pluginName/lib/ layout the IntelliJ Marketplace expects, runs the
+  JetBrains plugin verifier, and lints with ktlint.
+repositories:
+  - https://www.jetbrains.com/intellij-repository/releases
+  - https://cache-redirector.jetbrains.com/intellij-dependencies
+dependencies:
+  # IntelliJ Platform — pinned to the build that ships in IDEA Community 2025.3
+  # (also the floor of pluginSinceBuild). The set is the minimal one that
+  # resolves every com.intellij.* import the plugin uses.
+  - com.jetbrains.intellij.platform:lsp:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:core:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:core-impl:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:ide:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:ide-core:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:ide-core-impl:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:ide-impl:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:ide-util-io:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:lang:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:editor:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:editor-ui:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:execution:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:analysis:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:util:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:util-ex:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:util-ui:253.28294.334: compile-only
+  - com.jetbrains.intellij.platform:project-model:253.28294.334: compile-only
+  - org.eclipse.lsp4j:org.eclipse.lsp4j:0.21.1: compile-only
+  - org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:0.21.1: compile-only
+  - com.google.code.gson:gson:2.10.1: compile-only
+settings:
+  jvm:
+    release: 21
+  kotlin:
+    version: 2.2.21
+plugins:
+  tally-build:
+    enabled: true
+    pluginId: io.github.wharflab.tally
+    pluginName: Tally
+    pluginVersion: 0.1.0-dev
+    # Build that ships in IDEA Community 2025.3 / WebStorm 2025.3.
+    pluginSinceBuild: "253.28294"
+    # Linux archive works for all build hosts. WebStorm and IDEA Community
+    # share the same build-number lineage; IDEA Community is also what we
+    # smoke-check against, so we only need one IDE distribution.
+    ideArchiveUrl: https://download.jetbrains.com/idea/idea-2025.3.tar.gz
+    ideArchiveSha256: 13f4174ba16c1cef04871cb261433536d002586c269a809392c20ee3f94959f5
+    pluginVerifierUrl: https://github.com/JetBrains/intellij-plugin-verifier/releases/download/1.400/verifier-cli-1.400-all.jar
+    pluginVerifierSha256: 11865375fd0d7008164ba3500351e4d8fe475ba89ee18371ba9668ef33ecffa8
+    ktlintVersion: "1.5.0"
+    ktlintSha256: a16be01dcc480aab2f55f444b620142152f66e31564b3b9376506d624c28a2ad

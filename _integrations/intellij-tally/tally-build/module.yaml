@@ -1,0 +1,13 @@
+---
+product: jvm/amper-plugin
+description: Builds, packages, verifies, and lints the Tally IntelliJ plugin.
+pluginInfo:
+  settingsClass: io.github.wharflab.tally.toolchain.TallyBuildSettings
+dependencies:
+  # Used by Download.kt to extract IDE/IDEA tarballs without shelling out to
+  # tar(1). Plain gzip rides on java.util.zip.GZIPInputStream so no xz/zstd
+  # transitive deps are pulled in.
+  - org.apache.commons:commons-compress:1.27.1
+settings:
+  jvm:
+    release: 21

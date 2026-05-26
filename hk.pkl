@@ -7,6 +7,7 @@ import "package://github.com/jdx/hk/releases/download/v1.44.2/hk@1.44.2#/Builtin
 
 env {
   ["GOEXPERIMENT"] = "jsonv2"
+  ["KOTLIN_CLI_NO_WELCOME_BANNER"] = "1"
 }
 
 local preCommitSteps = new Mapping<String, Step> {
@@ -50,12 +51,16 @@ local preCommitSteps = new Mapping<String, Step> {
     fix = "bunx -y -q oxfmt --no-error-on-unmatched-pattern --write {{files}}"
   }
   ["ktlint-format"] {
-    glob = List("_integrations/intellij-tally/src/main/kotlin/**/*.kt")
-    fix = "bash _integrations/intellij-tally/build/ktlint.sh --format {{files}}"
+    glob = List("_integrations/intellij-tally/intellij-plugin/src/**/*.kt")
+    dir = "_integrations/intellij-tally"
+    // The Kotlin Toolchain plugin lints the whole intellij-plugin/src dir;
+    // it doesn't take a file list, so {{files}} is intentionally absent.
+    fix = "./kotlin do ktlintFix"
   }
   ["ktlint-lint"] {
-    glob = List("_integrations/intellij-tally/src/main/kotlin/**/*.kt")
-    check = "bash _integrations/intellij-tally/build/ktlint.sh {{files}}"
+    glob = List("_integrations/intellij-tally/intellij-plugin/src/**/*.kt")
+    dir = "_integrations/intellij-tally"
+    check = "./kotlin do ktlint"
     depends = List("ktlint-format")
   }
   ["rust-fmt"] = (Builtins.cargo_fmt) {
