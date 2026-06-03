@@ -1,6 +1,6 @@
 module github.com/wharflab/tally/_tools
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/atombender/go-jsonschema v0.23.0
