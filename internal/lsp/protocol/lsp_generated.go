@@ -4106,11 +4106,11 @@ type InlineValueParams struct {
 	// The text document.
 	TextDocument TextDocumentIdentifier `json:"textDocument"`
 
-	// The document range for which inline values should be computed.
+	// The document range for which inline values information will be returned.
 	Range Range `json:"range"`
 
-	// Additional information about the context in which inline values were
-	// requested.
+	// Additional information about the context in which inline values information was
+	// requested.	 */
 	Context *InlineValueContext `json:"context"`
 }
 
@@ -5376,8 +5376,6 @@ func (s *DidCloseNotebookDocumentParams) UnmarshalJSONFrom(dec *jsontext.Decoder
 // A parameter literal used in inline completion requests.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type InlineCompletionParams struct {
 	// The text document.
 	TextDocument TextDocumentIdentifier `json:"textDocument"`
@@ -5473,8 +5471,6 @@ func (s *InlineCompletionParams) UnmarshalJSONFrom(dec *jsontext.Decoder) error 
 // Represents a collection of items to be presented in the editor.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type InlineCompletionList struct {
 	// The inline completion items
 	Items []*InlineCompletionItem `json:"items"`
@@ -5530,8 +5526,6 @@ func (s *InlineCompletionList) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // An inline completion item represents a text snippet that is proposed inline to complete text that is being typed.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type InlineCompletionItem struct {
 	// The text to replace the range with. Must be set.
 	InsertText StringOrStringValue `json:"insertText"`
@@ -5608,8 +5602,6 @@ func (s *InlineCompletionItem) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // Inline completion options used during static or dynamic registration.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type InlineCompletionRegistrationOptions struct {
 	WorkDoneProgress *bool `json:"workDoneProgress,omitzero"`
 
@@ -5680,8 +5672,6 @@ func (s *InlineCompletionRegistrationOptions) UnmarshalJSONFrom(dec *jsontext.De
 // Parameters for the `workspace/textDocumentContent` request.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type TextDocumentContentParams struct {
 	// The uri of the text document.
 	Uri DocumentUri `json:"uri"`
@@ -5737,8 +5727,6 @@ func (s *TextDocumentContentParams) UnmarshalJSONFrom(dec *jsontext.Decoder) err
 // Result of the `workspace/textDocumentContent` request.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type TextDocumentContentResult struct {
 	// The text content of the text document. Please note, that the content of
 	// any subsequent open notifications for the text document might differ
@@ -5797,8 +5785,6 @@ func (s *TextDocumentContentResult) UnmarshalJSONFrom(dec *jsontext.Decoder) err
 // Text document content provider registration options.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type TextDocumentContentRegistrationOptions struct {
 	// The schemes for which the server provides content.
 	Schemes []string `json:"schemes"`
@@ -5862,8 +5848,6 @@ func (s *TextDocumentContentRegistrationOptions) UnmarshalJSONFrom(dec *jsontext
 // Parameters for the `workspace/textDocumentContent/refresh` request.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type TextDocumentContentRefreshParams struct {
 	// The uri of the text document to refresh.
 	Uri DocumentUri `json:"uri"`
@@ -8196,6 +8180,9 @@ type SignatureHelp struct {
 	// In future version of the protocol this property might become
 	// mandatory (but still nullable) to better express the active parameter if
 	// the active signature does have any.
+	//
+	// Since version 3.16.0 the `SignatureInformation` itself provides a
+	// `activeParameter` property and it should be used instead of this one.
 	ActiveParameter *UintegerOrNull `json:"activeParameter,omitzero"`
 }
 
@@ -9341,8 +9328,6 @@ type Command struct {
 	// An optional tooltip.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	Tooltip *string `json:"tooltip,omitzero"`
 
 	// The identifier of the actual command handler.
@@ -9586,8 +9571,6 @@ type CodeActionRegistrationOptions struct {
 	// At most one documentation entry should be shown per provider.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	Documentation *[]*CodeActionKindDocumentation `json:"documentation,omitzero"`
 
 	// The server provides support to resolve additional
@@ -10525,8 +10508,6 @@ type DocumentRangeFormattingRegistrationOptions struct {
 	// Whether the server supports formatting multiple ranges at once.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	RangesSupport *bool `json:"rangesSupport,omitzero"`
 }
 
@@ -10588,8 +10569,6 @@ func (s *DocumentRangeFormattingRegistrationOptions) UnmarshalJSONFrom(dec *json
 // The parameters of a DocumentRangesFormattingRequest.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type DocumentRangesFormattingParams struct {
 	// An optional token that a server can use to report work done progress.
 	WorkDoneToken *IntegerOrString `json:"workDoneToken,omitzero"`
@@ -11233,8 +11212,6 @@ type ApplyWorkspaceEditParams struct {
 	// Additional data about the edit.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	Metadata *WorkspaceEditMetadata `json:"metadata,omitzero"`
 }
 
@@ -13307,7 +13284,7 @@ func (s *InlineValueContext) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	return nil
 }
 
-// Provide inline value as text.
+// Returns inline value information as the complete text to be shown.
 //
 // Since: 3.17.0
 type InlineValueText struct {
@@ -13374,14 +13351,20 @@ func (s *InlineValueText) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	return nil
 }
 
-// Provide inline value through a variable lookup.
-// If only a range is specified, the variable name will be extracted from the underlying document.
-// An optional variable name can be used to override the extracted name.
+// To compute inline value through a variable lookup.
+//
+// If only a range is specified, the variable name should
+// be extracted from the underlying document.
+//
+// An optional variable name could be used to lookup instead
+// of the extracted name.
 //
 // Since: 3.17.0
 type InlineValueVariableLookup struct {
 	// The document range for which the inline value applies.
-	// The range is used to extract the variable name from the underlying document.
+	//
+	// The range could be used to extract the variable name
+	// from the underlying document.
 	Range Range `json:"range"`
 
 	// If specified the name of the variable to look up.
@@ -13451,17 +13434,23 @@ func (s *InlineValueVariableLookup) UnmarshalJSONFrom(dec *jsontext.Decoder) err
 	return nil
 }
 
-// Provide an inline value through an expression evaluation.
-// If only a range is specified, the expression will be extracted from the underlying document.
-// An optional expression can be used to override the extracted expression.
+// To compute an inline value through an expression evaluation.
+//
+// If only a range is specified, the expression should be
+// extracted from the underlying document.
+//
+// An optional expression could be evaluated instead of
+// the extracted expression.
 //
 // Since: 3.17.0
 type InlineValueEvaluatableExpression struct {
 	// The document range for which the inline value applies.
-	// The range is used to extract the evaluatable expression from the underlying document.
+	//
+	// The range could be used to extract the evaluatable expression
+	// from the underlying document.
 	Range Range `json:"range"`
 
-	// If specified the expression overrides the extracted expression.
+	// If specified the expression could be evaluated instead.
 	Expression *string `json:"expression,omitzero"`
 }
 
@@ -14591,8 +14580,6 @@ func (s *NotebookDocumentIdentifier) UnmarshalJSONFrom(dec *jsontext.Decoder) er
 // Provides information about the context in which an inline completion was requested.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type InlineCompletionContext struct {
 	// Describes how the inline completion was triggered.
 	TriggerKind InlineCompletionTriggerKind `json:"triggerKind"`
@@ -14661,8 +14648,6 @@ func (s *InlineCompletionContext) UnmarshalJSONFrom(dec *jsontext.Decoder) error
 // `${name:default value}`.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type StringValue struct {
 	// The kind of string value.
 	Kind StringLiteralSnippet `json:"kind"`
@@ -14730,8 +14715,6 @@ func (s *StringValue) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // Inline completion options used during static registration.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type InlineCompletionOptions struct {
 	WorkDoneProgress *bool `json:"workDoneProgress,omitzero"`
 }
@@ -14739,8 +14722,6 @@ type InlineCompletionOptions struct {
 // Text document content provider options.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type TextDocumentContentOptions struct {
 	// The schemes for which the server provides content.
 	Schemes []string `json:"schemes"`
@@ -15080,8 +15061,6 @@ type ServerCapabilities struct {
 	// Inline completion options used during static registration.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	InlineCompletionProvider *BooleanOrInlineCompletionOptions `json:"inlineCompletionProvider,omitzero"`
 
 	// Workspace specific server capabilities.
@@ -15376,8 +15355,11 @@ type Diagnostic struct {
 	// appears in the user interface.
 	Source *string `json:"source,omitzero"`
 
-	// The diagnostic's message. It usually appears in the user interface
-	Message string `json:"message"`
+	// The diagnostic's message. It usually appears in the user interface.
+	//
+	// Since: 3.18.0 - support for MarkupContent. This is guarded by the client
+	// capability `textDocument.diagnostic.markupMessageSupport`.
+	Message StringOrMarkupContent `json:"message"`
 
 	// Additional metadata about the diagnostic.
 	//
@@ -16289,8 +16271,6 @@ type CodeActionOptions struct {
 	// At most one documentation entry should be shown per provider.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	Documentation *[]*CodeActionKindDocumentation `json:"documentation,omitzero"`
 
 	// The server provides support to resolve additional
@@ -16485,8 +16465,6 @@ type DocumentRangeFormattingOptions struct {
 	// Whether the server supports formatting multiple ranges at once.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	RangesSupport *bool `json:"rangesSupport,omitzero"`
 }
 
@@ -16737,8 +16715,6 @@ func (s *ExecuteCommandOptions) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // Additional data about a workspace edit.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type WorkspaceEditMetadata struct {
 	// Signal to the editor that this edit is a refactoring.
 	IsRefactoring *bool `json:"isRefactoring,omitzero"`
@@ -16970,8 +16946,6 @@ func (s *AnnotatedTextEdit) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // An interactive text edit.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type SnippetTextEdit struct {
 	// The range of the text document to be manipulated.
 	Range Range `json:"range"`
@@ -17138,7 +17112,7 @@ type DeleteFileOptions struct {
 // Since: 3.16.0
 type FileOperationPattern struct {
 	// The glob pattern to match. Glob patterns can have the following syntax:
-	// - `*` to match one or more characters in a path segment
+	// - `*` to match zero or more characters in a path segment
 	// - `?` to match on one character in a path segment
 	// - `**` to match any number of path segments, including none
 	// - `{}` to group sub patterns into an OR expression. (e.g. `**​/*.{ts,js}` matches all TypeScript and JavaScript files)
@@ -17639,8 +17613,6 @@ type NotebookDocumentCellChanges struct {
 // Describes the currently selected completion item.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type SelectedCompletionInfo struct {
 	// The range that will be replaced if this completion item is accepted.
 	Range Range `json:"range"`
@@ -17830,8 +17802,6 @@ type WorkspaceOptions struct {
 	// The server supports the `workspace/textDocumentContent` request.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	TextDocumentContent *TextDocumentContentOptionsOrRegistrationOptions `json:"textDocumentContent,omitzero"`
 }
 
@@ -18300,8 +18270,6 @@ func (s *ParameterInformation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // Documentation for a class of code actions.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type CodeActionKindDocumentation struct {
 	// The kind of the code action being documented.
 	//
@@ -18767,15 +18735,11 @@ type WorkspaceClientCapabilities struct {
 	// Capabilities specific to the folding range requests scoped to the workspace.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	FoldingRange *FoldingRangeWorkspaceClientCapabilities `json:"foldingRange,omitzero"`
 
 	// Capabilities specific to the `workspace/textDocumentContent` request.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	TextDocumentContent *TextDocumentContentClientCapabilities `json:"textDocumentContent,omitzero"`
 }
 
@@ -18908,8 +18872,6 @@ type TextDocumentClientCapabilities struct {
 	// Client capabilities specific to inline completions.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	InlineCompletion *InlineCompletionClientCapabilities `json:"inlineCompletion,omitzero"`
 }
 
@@ -19678,15 +19640,11 @@ type WorkspaceEditClientCapabilities struct {
 	// Whether the client supports `WorkspaceEditMetadata` in `WorkspaceEdit`s.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	MetadataSupport *bool `json:"metadataSupport,omitzero"`
 
 	// Whether the client supports snippets as text edits.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	SnippetEditSupport *bool `json:"snippetEditSupport,omitzero"`
 }
 
@@ -19834,8 +19792,6 @@ type DiagnosticWorkspaceClientCapabilities struct {
 // Client workspace capabilities specific to folding ranges
 //
 // Since: 3.18.0
-//
-// Proposed.
 type FoldingRangeWorkspaceClientCapabilities struct {
 	// Whether the client implementation supports a refresh request sent from the
 	// server to the client.
@@ -19846,16 +19802,12 @@ type FoldingRangeWorkspaceClientCapabilities struct {
 	// change that requires such a calculation.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	RefreshSupport *bool `json:"refreshSupport,omitzero"`
 }
 
 // Client capabilities for a text document content provider.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type TextDocumentContentClientCapabilities struct {
 	// Text document content provider supports dynamic registration.
 	DynamicRegistration *bool `json:"dynamicRegistration,omitzero"`
@@ -19893,6 +19845,7 @@ type CompletionClientCapabilities struct {
 	// capabilities.
 	CompletionItem *ClientCompletionItemOptions `json:"completionItem,omitzero"`
 
+	// The client supports the following completion item kinds.
 	CompletionItemKind *ClientCompletionItemOptionsKind `json:"completionItemKind,omitzero"`
 
 	// Defines how the client handles whitespace and indentation
@@ -20074,8 +20027,6 @@ type CodeActionClientCapabilities struct {
 	// code actions.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	DocumentationSupport *bool `json:"documentationSupport,omitzero"`
 
 	// Client supports the tag property on a code action. Clients
@@ -20129,8 +20080,6 @@ type DocumentRangeFormattingClientCapabilities struct {
 	// Whether the client supports formatting multiple ranges at once.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	RangesSupport *bool `json:"rangesSupport,omitzero"`
 }
 
@@ -20468,13 +20417,16 @@ type DiagnosticClientCapabilities struct {
 
 	// Whether the clients supports related documents for document diagnostic pulls.
 	RelatedDocumentSupport *bool `json:"relatedDocumentSupport,omitzero"`
+
+	// Whether the client supports `MarkupContent` in diagnostic messages.
+	//
+	// Since: 3.18.0
+	MarkupMessageSupport *bool `json:"markupMessageSupport,omitzero"`
 }
 
 // Client capabilities specific to inline completions.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type InlineCompletionClientCapabilities struct {
 	// Whether implementation supports dynamic registration for inline completion providers.
 	DynamicRegistration *bool `json:"dynamicRegistration,omitzero"`
@@ -21005,8 +20957,6 @@ type ClientSignatureInformationOptions struct {
 	// indicate that no parameter should be active.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	NoActiveParameterSupport *bool `json:"noActiveParameterSupport,omitzero"`
 }
 
@@ -21973,8 +21923,6 @@ const (
 	// A debug message.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	MessageTypeDebug MessageType = 5
 )
 
@@ -22237,8 +22185,6 @@ const (
 	// - ...
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	CodeActionKindRefactorMove CodeActionKind = "refactor.move"
 	// Base kind for refactoring rewrite actions: 'refactor.rewrite'
 	//
@@ -22334,12 +22280,8 @@ const (
 	LanguageKindCSharp       LanguageKind = "csharp"
 	LanguageKindCSS          LanguageKind = "css"
 	// Since: 3.18.0
-	//
-	// Proposed.
 	LanguageKindD LanguageKind = "d"
 	// Since: 3.18.0
-	//
-	// Proposed.
 	LanguageKindDelphi          LanguageKind = "pascal"
 	LanguageKindDiff            LanguageKind = "diff"
 	LanguageKindDart            LanguageKind = "dart"
@@ -22348,7 +22290,7 @@ const (
 	LanguageKindErlang          LanguageKind = "erlang"
 	LanguageKindFSharp          LanguageKind = "fsharp"
 	LanguageKindGitCommit       LanguageKind = "git-commit"
-	LanguageKindGitRebase       LanguageKind = "rebase"
+	LanguageKindGitRebase       LanguageKind = "git-rebase"
 	LanguageKindGo              LanguageKind = "go"
 	LanguageKindGroovy          LanguageKind = "groovy"
 	LanguageKindHandlebars      LanguageKind = "handlebars"
@@ -22367,12 +22309,11 @@ const (
 	LanguageKindObjectiveC      LanguageKind = "objective-c"
 	LanguageKindObjectiveCPP    LanguageKind = "objective-cpp"
 	// Since: 3.18.0
-	//
-	// Proposed.
 	LanguageKindPascal          LanguageKind = "pascal"
 	LanguageKindPerl            LanguageKind = "perl"
 	LanguageKindPerl6           LanguageKind = "perl6"
 	LanguageKindPHP             LanguageKind = "php"
+	LanguageKindPlaintext       LanguageKind = "plaintext"
 	LanguageKindPowershell      LanguageKind = "powershell"
 	LanguageKindPug             LanguageKind = "jade"
 	LanguageKindPython          LanguageKind = "python"
@@ -22399,8 +22340,6 @@ const (
 // Describes how an provider was triggered.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type InlineCompletionTriggerKind uint32
 
 const (
@@ -22595,7 +22534,7 @@ const (
 	ApplyKindReplace ApplyKind = 1
 	// The value from the item will be merged with the default.
 	//
-	// The specific rules for mergeing values are defined against each field
+	// The specific rules for merging values are defined against each field
 	// that supports merging.
 	ApplyKindMerge ApplyKind = 2
 )
@@ -23126,7 +23065,7 @@ const (
 	MethodTextDocumentDocumentColor Method = "textDocument/documentColor"
 	// A request to list all presentation for a color. The request's
 	// parameter is of type ColorPresentationParams the
-	// response is of type ColorInformation[] or a Thenable
+	// response is of type ColorPresentation[] or a Thenable
 	// that resolves to such.
 	MethodTextDocumentColorPresentation Method = "textDocument/colorPresentation"
 	// A request to provide folding ranges in a document. The request's
@@ -23134,9 +23073,9 @@ const (
 	// response is of type FoldingRangeList or a Thenable
 	// that resolves to such.
 	MethodTextDocumentFoldingRange Method = "textDocument/foldingRange"
-	// Since: 3.18.0
+	// A request to refresh the folding ranges in a document.
 	//
-	// Proposed.
+	// Since: 3.18.0
 	MethodWorkspaceFoldingRangeRefresh Method = "workspace/foldingRange/refresh"
 	// A request to resolve the type definition locations of a symbol at a given text
 	// document position. The request's parameter is of type TextDocumentPositionParams
@@ -23258,22 +23197,16 @@ const (
 	// InlineCompletion[] or a Thenable that resolves to such.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	MethodTextDocumentInlineCompletion Method = "textDocument/inlineCompletion"
 	// The `workspace/textDocumentContent` request is sent from the client to the
 	// server to request the content of a text document.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	MethodWorkspaceTextDocumentContent Method = "workspace/textDocumentContent"
 	// The `workspace/textDocumentContent` request is sent from the server to the client to refresh
 	// the content of a specific text document.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	MethodWorkspaceTextDocumentContentRefresh Method = "workspace/textDocumentContent/refresh"
 	// The `client/registerCapability` request is sent from the server to the client to register a new capability
 	// handler on the client side.
@@ -23382,8 +23315,6 @@ const (
 	// A request to format ranges in a document.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	MethodTextDocumentRangesFormatting Method = "textDocument/rangesFormatting"
 	// A request to format a document on type.
 	MethodTextDocumentOnTypeFormatting Method = "textDocument/onTypeFormatting"
@@ -23799,7 +23730,7 @@ type DocumentHighlightResponse = DocumentHighlightsOrNull
 var TextDocumentDocumentHighlightInfo = RequestInfo[*DocumentHighlightParams, DocumentHighlightResponse]{Method: MethodTextDocumentDocumentHighlight}
 
 // Response type for `textDocument/documentSymbol`
-type DocumentSymbolResponse = SymbolInformationsOrDocumentSymbolsOrNull
+type DocumentSymbolResponse = SymbolInformationOrDocumentSymbolsOrNull
 
 // Type mapping info for `textDocument/documentSymbol`
 var TextDocumentDocumentSymbolInfo = RequestInfo[*DocumentSymbolParams, DocumentSymbolResponse]{Method: MethodTextDocumentDocumentSymbol}
@@ -23817,7 +23748,7 @@ type CodeActionResolveResponse = *CodeAction
 var CodeActionResolveInfo = RequestInfo[*CodeAction, CodeActionResolveResponse]{Method: MethodCodeActionResolve}
 
 // Response type for `workspace/symbol`
-type WorkspaceSymbolResponse = SymbolInformationsOrWorkspaceSymbolsOrNull
+type WorkspaceSymbolResponse = SymbolInformationOrWorkspaceSymbolsOrNull
 
 // Type mapping info for `workspace/symbol`
 var WorkspaceSymbolInfo = RequestInfo[*WorkspaceSymbolParams, WorkspaceSymbolResponse]{Method: MethodWorkspaceSymbol}
@@ -27832,18 +27763,18 @@ func (o *DocumentHighlightsOrNull) UnmarshalJSONFrom(dec *jsontext.Decoder) erro
 	return fmt.Errorf("invalid DocumentHighlightsOrNull: %s", data)
 }
 
-type SymbolInformationsOrDocumentSymbolsOrNull struct {
-	SymbolInformations *[]*SymbolInformation
+type SymbolInformationOrDocumentSymbolsOrNull struct {
+	SymbolInformation *[]*SymbolInformation
 	DocumentSymbols    *[]*DocumentSymbol
 }
 
-var _ json.MarshalerTo = (*SymbolInformationsOrDocumentSymbolsOrNull)(nil)
+var _ json.MarshalerTo = (*SymbolInformationOrDocumentSymbolsOrNull)(nil)
 
-func (o *SymbolInformationsOrDocumentSymbolsOrNull) MarshalJSONTo(enc *jsontext.Encoder) error {
-	assertAtMostOne("more than one element of SymbolInformationsOrDocumentSymbolsOrNull is set", o.SymbolInformations != nil, o.DocumentSymbols != nil)
+func (o *SymbolInformationOrDocumentSymbolsOrNull) MarshalJSONTo(enc *jsontext.Encoder) error {
+	assertAtMostOne("more than one element of SymbolInformationOrDocumentSymbolsOrNull is set", o.SymbolInformation != nil, o.DocumentSymbols != nil)
 
-	if o.SymbolInformations != nil {
-		return json.MarshalEncode(enc, o.SymbolInformations)
+	if o.SymbolInformation != nil {
+		return json.MarshalEncode(enc, o.SymbolInformation)
 	}
 	if o.DocumentSymbols != nil {
 		return json.MarshalEncode(enc, o.DocumentSymbols)
@@ -27851,10 +27782,10 @@ func (o *SymbolInformationsOrDocumentSymbolsOrNull) MarshalJSONTo(enc *jsontext.
 	return enc.WriteToken(jsontext.Null)
 }
 
-var _ json.UnmarshalerFrom = (*SymbolInformationsOrDocumentSymbolsOrNull)(nil)
+var _ json.UnmarshalerFrom = (*SymbolInformationOrDocumentSymbolsOrNull)(nil)
 
-func (o *SymbolInformationsOrDocumentSymbolsOrNull) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	*o = SymbolInformationsOrDocumentSymbolsOrNull{}
+func (o *SymbolInformationOrDocumentSymbolsOrNull) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	*o = SymbolInformationOrDocumentSymbolsOrNull{}
 
 	data, err := dec.ReadValue()
 	if err != nil {
@@ -27864,9 +27795,9 @@ func (o *SymbolInformationsOrDocumentSymbolsOrNull) UnmarshalJSONFrom(dec *jsont
 		return nil
 	}
 
-	var vSymbolInformations []*SymbolInformation
-	if err := json.Unmarshal(data, &vSymbolInformations); err == nil {
-		o.SymbolInformations = &vSymbolInformations
+	var vSymbolInformation []*SymbolInformation
+	if err := json.Unmarshal(data, &vSymbolInformation); err == nil {
+		o.SymbolInformation = &vSymbolInformation
 		return nil
 	}
 	var vDocumentSymbols []*DocumentSymbol
@@ -27874,7 +27805,7 @@ func (o *SymbolInformationsOrDocumentSymbolsOrNull) UnmarshalJSONFrom(dec *jsont
 		o.DocumentSymbols = &vDocumentSymbols
 		return nil
 	}
-	return fmt.Errorf("invalid SymbolInformationsOrDocumentSymbolsOrNull: %s", data)
+	return fmt.Errorf("invalid SymbolInformationOrDocumentSymbolsOrNull: %s", data)
 }
 
 type CommandOrCodeAction struct {
@@ -27954,18 +27885,18 @@ func (o *CommandOrCodeActionArrayOrNull) UnmarshalJSONFrom(dec *jsontext.Decoder
 	return fmt.Errorf("invalid CommandOrCodeActionArrayOrNull: %s", data)
 }
 
-type SymbolInformationsOrWorkspaceSymbolsOrNull struct {
-	SymbolInformations *[]*SymbolInformation
+type SymbolInformationOrWorkspaceSymbolsOrNull struct {
+	SymbolInformation *[]*SymbolInformation
 	WorkspaceSymbols   *[]*WorkspaceSymbol
 }
 
-var _ json.MarshalerTo = (*SymbolInformationsOrWorkspaceSymbolsOrNull)(nil)
+var _ json.MarshalerTo = (*SymbolInformationOrWorkspaceSymbolsOrNull)(nil)
 
-func (o *SymbolInformationsOrWorkspaceSymbolsOrNull) MarshalJSONTo(enc *jsontext.Encoder) error {
-	assertAtMostOne("more than one element of SymbolInformationsOrWorkspaceSymbolsOrNull is set", o.SymbolInformations != nil, o.WorkspaceSymbols != nil)
+func (o *SymbolInformationOrWorkspaceSymbolsOrNull) MarshalJSONTo(enc *jsontext.Encoder) error {
+	assertAtMostOne("more than one element of SymbolInformationOrWorkspaceSymbolsOrNull is set", o.SymbolInformation != nil, o.WorkspaceSymbols != nil)
 
-	if o.SymbolInformations != nil {
-		return json.MarshalEncode(enc, o.SymbolInformations)
+	if o.SymbolInformation != nil {
+		return json.MarshalEncode(enc, o.SymbolInformation)
 	}
 	if o.WorkspaceSymbols != nil {
 		return json.MarshalEncode(enc, o.WorkspaceSymbols)
@@ -27973,10 +27904,10 @@ func (o *SymbolInformationsOrWorkspaceSymbolsOrNull) MarshalJSONTo(enc *jsontext
 	return enc.WriteToken(jsontext.Null)
 }
 
-var _ json.UnmarshalerFrom = (*SymbolInformationsOrWorkspaceSymbolsOrNull)(nil)
+var _ json.UnmarshalerFrom = (*SymbolInformationOrWorkspaceSymbolsOrNull)(nil)
 
-func (o *SymbolInformationsOrWorkspaceSymbolsOrNull) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	*o = SymbolInformationsOrWorkspaceSymbolsOrNull{}
+func (o *SymbolInformationOrWorkspaceSymbolsOrNull) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	*o = SymbolInformationOrWorkspaceSymbolsOrNull{}
 
 	data, err := dec.ReadValue()
 	if err != nil {
@@ -27986,9 +27917,9 @@ func (o *SymbolInformationsOrWorkspaceSymbolsOrNull) UnmarshalJSONFrom(dec *json
 		return nil
 	}
 
-	var vSymbolInformations []*SymbolInformation
-	if err := json.Unmarshal(data, &vSymbolInformations); err == nil {
-		o.SymbolInformations = &vSymbolInformations
+	var vSymbolInformation []*SymbolInformation
+	if err := json.Unmarshal(data, &vSymbolInformation); err == nil {
+		o.SymbolInformation = &vSymbolInformation
 		return nil
 	}
 	var vWorkspaceSymbols []*WorkspaceSymbol
@@ -27996,7 +27927,7 @@ func (o *SymbolInformationsOrWorkspaceSymbolsOrNull) UnmarshalJSONFrom(dec *json
 		o.WorkspaceSymbols = &vWorkspaceSymbols
 		return nil
 	}
-	return fmt.Errorf("invalid SymbolInformationsOrWorkspaceSymbolsOrNull: %s", data)
+	return fmt.Errorf("invalid SymbolInformationOrWorkspaceSymbolsOrNull: %s", data)
 }
 
 type CodeLensesOrNull struct {
@@ -28571,14 +28502,10 @@ type ResolvedWorkspaceEditClientCapabilities struct {
 	// Whether the client supports `WorkspaceEditMetadata` in `WorkspaceEdit`s.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	MetadataSupport bool `json:"metadataSupport,omitzero"`
 	// Whether the client supports snippets as text edits.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	SnippetEditSupport bool `json:"snippetEditSupport,omitzero"`
 }
 
@@ -28924,8 +28851,6 @@ func resolveDiagnosticWorkspaceClientCapabilities(v *DiagnosticWorkspaceClientCa
 // # Client workspace capabilities specific to folding ranges
 //
 // Since: 3.18.0
-//
-// Proposed.
 type ResolvedFoldingRangeWorkspaceClientCapabilities struct {
 	// Whether the client implementation supports a refresh request sent from the
 	// server to the client.
@@ -28936,8 +28861,6 @@ type ResolvedFoldingRangeWorkspaceClientCapabilities struct {
 	// change that requires such a calculation.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	RefreshSupport bool `json:"refreshSupport,omitzero"`
 }
 
@@ -28956,8 +28879,6 @@ func resolveFoldingRangeWorkspaceClientCapabilities(v *FoldingRangeWorkspaceClie
 // Client capabilities for a text document content provider.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type ResolvedTextDocumentContentClientCapabilities struct {
 	// Text document content provider supports dynamic registration.
 	DynamicRegistration bool `json:"dynamicRegistration,omitzero"`
@@ -29031,14 +28952,10 @@ type ResolvedWorkspaceClientCapabilities struct {
 	// Capabilities specific to the folding range requests scoped to the workspace.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	FoldingRange ResolvedFoldingRangeWorkspaceClientCapabilities `json:"foldingRange,omitzero"`
 	// Capabilities specific to the `workspace/textDocumentContent` request.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	TextDocumentContent ResolvedTextDocumentContentClientCapabilities `json:"textDocumentContent,omitzero"`
 }
 
@@ -29309,7 +29226,8 @@ type ResolvedCompletionClientCapabilities struct {
 	DynamicRegistration bool `json:"dynamicRegistration,omitzero"`
 	// The client supports the following `CompletionItem` specific
 	// capabilities.
-	CompletionItem     ResolvedClientCompletionItemOptions     `json:"completionItem,omitzero"`
+	CompletionItem ResolvedClientCompletionItemOptions `json:"completionItem,omitzero"`
+	// The client supports the following completion item kinds.
 	CompletionItemKind ResolvedClientCompletionItemOptionsKind `json:"completionItemKind,omitzero"`
 	// Defines how the client handles whitespace and indentation
 	// when accepting a completion item that uses multi line
@@ -29402,8 +29320,6 @@ type ResolvedClientSignatureInformationOptions struct {
 	// indicate that no parameter should be active.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	NoActiveParameterSupport bool `json:"noActiveParameterSupport,omitzero"`
 }
 
@@ -29739,8 +29655,6 @@ type ResolvedCodeActionClientCapabilities struct {
 	// code actions.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	DocumentationSupport bool `json:"documentationSupport,omitzero"`
 	// Client supports the tag property on a code action. Clients
 	// supporting tags have to handle unknown tags gracefully.
@@ -29877,8 +29791,6 @@ type ResolvedDocumentRangeFormattingClientCapabilities struct {
 	// Whether the client supports formatting multiple ranges at once.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	RangesSupport bool `json:"rangesSupport,omitzero"`
 }
 
@@ -30372,6 +30284,10 @@ type ResolvedDiagnosticClientCapabilities struct {
 	DynamicRegistration bool `json:"dynamicRegistration,omitzero"`
 	// Whether the clients supports related documents for document diagnostic pulls.
 	RelatedDocumentSupport bool `json:"relatedDocumentSupport,omitzero"`
+	// Whether the client supports `MarkupContent` in diagnostic messages.
+	//
+	// Since: 3.18.0
+	MarkupMessageSupport bool `json:"markupMessageSupport,omitzero"`
 }
 
 func resolveDiagnosticClientCapabilities(v *DiagnosticClientCapabilities) ResolvedDiagnosticClientCapabilities {
@@ -30385,6 +30301,7 @@ func resolveDiagnosticClientCapabilities(v *DiagnosticClientCapabilities) Resolv
 		DataSupport:            derefOr(v.DataSupport),
 		DynamicRegistration:    derefOr(v.DynamicRegistration),
 		RelatedDocumentSupport: derefOr(v.RelatedDocumentSupport),
+		MarkupMessageSupport:   derefOr(v.MarkupMessageSupport),
 	}
 }
 
@@ -30394,8 +30311,6 @@ func resolveDiagnosticClientCapabilities(v *DiagnosticClientCapabilities) Resolv
 // Client capabilities specific to inline completions.
 //
 // Since: 3.18.0
-//
-// Proposed.
 type ResolvedInlineCompletionClientCapabilities struct {
 	// Whether implementation supports dynamic registration for inline completion providers.
 	DynamicRegistration bool `json:"dynamicRegistration,omitzero"`
@@ -30511,8 +30426,6 @@ type ResolvedTextDocumentClientCapabilities struct {
 	// Client capabilities specific to inline completions.
 	//
 	// Since: 3.18.0
-	//
-	// Proposed.
 	InlineCompletion ResolvedInlineCompletionClientCapabilities `json:"inlineCompletion,omitzero"`
 }
 

@@ -561,6 +561,18 @@ type documentFormattingParams struct {
 	Options      formattingOptions      `json:"options"`
 }
 
+type documentRangeFormattingParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Range        lspRange               `json:"range"`
+	Options      formattingOptions      `json:"options"`
+}
+
+type documentRangesFormattingParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Ranges       []lspRange             `json:"ranges"`
+	Options      formattingOptions      `json:"options"`
+}
+
 type formattingOptions struct {
 	TabSize                uint32 `json:"tabSize"`
 	InsertSpaces           bool   `json:"insertSpaces"`

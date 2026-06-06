@@ -28,8 +28,10 @@ import {
 import { type BinarySource, type ResolvedBinary } from "../binary/findBinary";
 
 export interface TallyLanguageClientInit {
-  output: vscode.OutputChannel;
-  traceOutput: vscode.OutputChannel;
+  // vscode-languageclient v10 requires LogOutputChannel — passing a plain
+  // OutputChannel here used to work in v9 but is now a type error.
+  output: vscode.LogOutputChannel;
+  traceOutput: vscode.LogOutputChannel;
   server: ResolvedBinary;
   settings: unknown;
 }
@@ -232,14 +234,14 @@ export class TallyLanguageClient {
 }
 
 class TallyVsCodeLanguageClient extends LanguageClient {
-  private readonly output: vscode.OutputChannel;
+  private readonly output: vscode.LogOutputChannel;
 
   public constructor(
     id: string,
     name: string,
     serverOptions: ServerOptions,
     clientOptions: LanguageClientOptions,
-    output: vscode.OutputChannel,
+    output: vscode.LogOutputChannel,
   ) {
     super(id, name, serverOptions, clientOptions);
     this.output = output;
@@ -257,9 +259,7 @@ class TallyVsCodeLanguageClient extends LanguageClient {
     }
 
     if (isBackgroundRequest(type)) {
-      this.output.appendLine(
-        `[tally] background request ${type.method} failed: ${describeError(error)}`,
-      );
+      this.output.warn(`background request ${type.method} failed: ${describeError(error)}`);
       return defaultValue;
     }
 

@@ -316,9 +316,66 @@ func matchingDiagnostics(v rules.Violation, diagnostics []*protocol.Diagnostic) 
 	vRange := violationRange(v)
 	var matched []*protocol.Diagnostic
 	for _, d := range diagnostics {
-		if d.Range.Start.Line == vRange.Start.Line && d.Message == v.Message {
+		if d.Range.Start.Line == vRange.Start.Line && diagnosticMessageEquals(d.Message, v.Message) {
 			matched = append(matched, d)
 		}
 	}
 	return matched
+}
+
+// diagnosticMessageEquals compares a Diagnostic.Message (which may carry either
+// a string or MarkupContent in LSP 3.18) against a plain string. Tally always
+// emits plain-string messages; MarkupContent on the client side falls back to
+// its `value` payload.
+func diagnosticMessageEquals(m protocol.StringOrMarkupContent, s string) bool {
+	if m.String != nil {
+		return *m.String == s
+	}
+	if m.MarkupContent != nil {
+		return m.MarkupContent.Value == s
+	}
+	return false
+}
+
+// plainDiagnosticMessage wraps a plain string in the StringOrMarkupContent union
+// used by Diagnostic.Message in LSP 3.18. Clients without
+// `textDocument.diagnostic.markupMessageSupport` still see the string variant
+// transparently because the union marshals as a JSON string here.
+func plainDiagnosticMessage(s string) protocol.StringOrMarkupContent {
+	return protocol.StringOrMarkupContent{String: &s}
+}
+
+// tallyRulesDocsURL is the canonical landing page for the rule documentation
+// surfaced through CodeActionKindDocumentation (LSP 3.18).
+const tallyRulesDocsURL = "https://tally.wharflab.com/rules"
+
+// codeActionOptions builds the ServerCapabilities.CodeActionOptions block.
+//
+// When the client advertises LSP 3.18 CodeAction documentationSupport we
+// attach a "Browse Tally rules" entry to the QuickFix kind so the actions
+// menu can teach users about the rule set without a separate command.
+func codeActionOptions(documentationSupported bool) *protocol.CodeActionOptions {
+	opts := &protocol.CodeActionOptions{
+		CodeActionKinds: new([]protocol.CodeActionKind{
+			protocol.CodeActionKindQuickFix,
+			suppressCodeActionKind,
+			"source.fixAll.tally",
+		}),
+	}
+	if !documentationSupported {
+		return opts
+	}
+
+	args := []any{map[string]any{"url": tallyRulesDocsURL}}
+	opts.Documentation = &[]*protocol.CodeActionKindDocumentation{
+		{
+			Kind: protocol.CodeActionKindQuickFix,
+			Command: &protocol.Command{
+				Title:     "Browse Tally rules",
+				Command:   openRuleDocCommand,
+				Arguments: &args,
+			},
+		},
+	}
+	return opts
 }

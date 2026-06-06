@@ -58,20 +58,21 @@ func TestMatchingDiagnostics(t *testing.T) {
 				Start: protocol.Position{Line: 2, Character: 0}, // 0-based line 2 = 1-based line 3
 				End:   protocol.Position{Line: 2, Character: 10},
 			},
-			Message: "test message",
+			Message: plainDiagnosticMessage("test message"),
 		},
 		{
 			Range: protocol.Range{
 				Start: protocol.Position{Line: 5, Character: 0},
 				End:   protocol.Position{Line: 5, Character: 10},
 			},
-			Message: "other message",
+			Message: plainDiagnosticMessage("other message"),
 		},
 	}
 
 	matched := matchingDiagnostics(v, diags)
 	assert.Len(t, matched, 1)
-	assert.Equal(t, "test message", matched[0].Message)
+	require.NotNil(t, matched[0].Message.String)
+	assert.Equal(t, "test message", *matched[0].Message.String)
 }
 
 func TestCodeActionsForDocument_FiltersInvocationContextsByRequestedRange(t *testing.T) {
@@ -193,7 +194,7 @@ func TestQuickFixActions_MultiFix(t *testing.T) {
 						Start: protocol.Position{Line: 4, Character: 0},
 						End:   protocol.Position{Line: 4, Character: 20},
 					},
-					Message: "STOPSIGNAL not supported",
+					Message: plainDiagnosticMessage("STOPSIGNAL not supported"),
 				},
 			},
 		},
@@ -233,7 +234,7 @@ func TestQuickFixActions_SingleFix_BackwardCompat(t *testing.T) {
 						Start: protocol.Position{Line: 2, Character: 0},
 						End:   protocol.Position{Line: 2, Character: 3},
 					},
-					Message: "do not use apt",
+					Message: plainDiagnosticMessage("do not use apt"),
 				},
 			},
 		},
