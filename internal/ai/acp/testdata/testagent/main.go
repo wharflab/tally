@@ -114,6 +114,10 @@ func (a *testAgent) Authenticate(ctx context.Context, params acpsdk.Authenticate
 	return acpsdk.AuthenticateResponse{}, nil
 }
 
+func (a *testAgent) Logout(ctx context.Context, params acpsdk.LogoutRequest) (acpsdk.LogoutResponse, error) {
+	return acpsdk.LogoutResponse{}, acpsdk.NewMethodNotFound(acpsdk.AgentMethodLogout)
+}
+
 func (a *testAgent) Initialize(ctx context.Context, params acpsdk.InitializeRequest) (acpsdk.InitializeResponse, error) {
 	return acpsdk.InitializeResponse{
 		ProtocolVersion:   acpsdk.ProtocolVersionNumber,
