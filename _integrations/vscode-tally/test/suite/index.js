@@ -179,6 +179,17 @@ function installOutputChannelSpy() {
       captured.push(value + "\n");
       return origAppendLine(value);
     };
+    // vscode-languageclient v10 requires LogOutputChannel and emits via
+    // typed log methods (trace/debug/info/warn/error) instead of appendLine,
+    // so the channel-level spy needs to observe those too.
+    for (const level of ["trace", "debug", "info", "warn", "error"]) {
+      if (typeof channel[level] !== "function") continue;
+      const orig = channel[level].bind(channel);
+      channel[level] = (value, ...args) => {
+        captured.push(String(value) + "\n");
+        return orig(value, ...args);
+      };
+    }
     return channel;
   };
   return {
