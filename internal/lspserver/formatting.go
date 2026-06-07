@@ -12,6 +12,7 @@ import (
 	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/linter"
 	"github.com/wharflab/tally/internal/processor"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // handleFormatting handles textDocument/formatting by applying safe auto-fixes.
@@ -23,7 +24,57 @@ func (s *Server) handleFormatting(ctx context.Context, params *protocol.Document
 	if doc == nil {
 		return nil, nil //nolint:nilnil // LSP: null result is valid for "no edits"
 	}
+	edits := s.formatRanges(ctx, doc, nil)
+	if edits == nil {
+		return nil, nil //nolint:nilnil // LSP: null result is valid for "no edits"
+	}
+	return edits, nil
+}
 
+// handleRangeFormatting handles textDocument/rangeFormatting.
+//
+// LSP 3.0+: a single contiguous range to format. We re-use the formatting
+// pipeline and filter fixes whose source span overlaps the requested range.
+func (s *Server) handleRangeFormatting(ctx context.Context, params *protocol.DocumentRangeFormattingParams) (any, error) {
+	doc := s.documents.Get(string(params.TextDocument.Uri))
+	if doc == nil {
+		return nil, nil //nolint:nilnil // LSP: null result is valid for "no edits"
+	}
+	edits := s.formatRanges(ctx, doc, []protocol.Range{params.Range})
+	if edits == nil {
+		return nil, nil //nolint:nilnil // LSP: null result is valid for "no edits"
+	}
+	return edits, nil
+}
+
+// handleRangesFormatting handles textDocument/rangesFormatting.
+//
+// LSP 3.18: multiple non-contiguous ranges to format in one request. This is
+// what VS Code emits when "Format Selection" is invoked on a multi-cursor
+// selection — sending one request per range would be wasteful here.
+func (s *Server) handleRangesFormatting(ctx context.Context, params *protocol.DocumentRangesFormattingParams) (any, error) {
+	doc := s.documents.Get(string(params.TextDocument.Uri))
+	if doc == nil {
+		return nil, nil //nolint:nilnil // LSP: null result is valid for "no edits"
+	}
+	if len(params.Ranges) == 0 {
+		return nil, nil //nolint:nilnil // nothing to format
+	}
+	edits := s.formatRanges(ctx, doc, params.Ranges)
+	if edits == nil {
+		return nil, nil //nolint:nilnil // LSP: null result is valid for "no edits"
+	}
+	return edits, nil
+}
+
+// formatRanges runs the lint/fix pipeline against the document and returns
+// the resulting edits. When ranges is non-nil, only violations whose source
+// span overlaps one of those ranges are fixed — this maps "Format Selection"
+// onto "fix what tally would fix within the selection".
+//
+// Returns nil when there is nothing to do; the caller must convert nil to
+// the LSP null result.
+func (s *Server) formatRanges(ctx context.Context, doc *Document, ranges []protocol.Range) []*protocol.TextEdit {
 	content := []byte(doc.Content)
 	input := s.lintInput(doc.URI, content)
 	fileKey := filepath.Clean(input.FilePath)
@@ -31,7 +82,7 @@ func (s *Server) handleFormatting(ctx context.Context, params *protocol.Document
 	// 1. Lint + filter: reuse shared pipeline.
 	result, err := linter.LintFileContext(ctx, input)
 	if err != nil {
-		return nil, nil //nolint:nilnil,nilerr // gracefully return no edits on lint error
+		return nil
 	}
 
 	chain := linter.LSPProcessors()
@@ -42,7 +93,34 @@ func (s *Server) handleFormatting(ctx context.Context, params *protocol.Document
 	)
 	violations := chain.Process(result.Violations, procCtx)
 
-	// 2. Apply style-safe fixes via existing fix infrastructure.
+	// 2. Restrict to violations that overlap the requested ranges. For range
+	// formatting we additionally drop async (resolver-backed) fixes — those are
+	// global structural transforms (e.g. inserting blank lines between every
+	// instruction) which would otherwise reflow the whole document even when
+	// only a single line is selected. The user expects "format this selection"
+	// to only touch the selection.
+	if ranges != nil {
+		filtered := make([]rules.Violation, 0, len(violations))
+		for _, v := range violations {
+			pf := v.PreferredFix()
+			if pf == nil || pf.NeedsResolve {
+				continue
+			}
+			vRange := violationRange(v)
+			for _, r := range ranges {
+				if rangesOverlap(vRange, r) || (rangeIsEmpty(r) && rangeContainsPosition(vRange, r.Start)) {
+					filtered = append(filtered, v)
+					break
+				}
+			}
+		}
+		if len(filtered) == 0 {
+			return nil
+		}
+		violations = filtered
+	}
+
+	// 3. Apply style-safe fixes via existing fix infrastructure.
 	// The fixer handles conflict resolution and ordering and respects per-rule fix modes.
 	fixModes := fix.BuildFixModes(result.Config)
 	fixer := &fix.Fixer{
@@ -53,19 +131,19 @@ func (s *Server) handleFormatting(ctx context.Context, params *protocol.Document
 	}
 	fixResult, err := fixer.Apply(ctx, violations, map[string][]byte{fileKey: content})
 	if err != nil {
-		return nil, nil //nolint:nilnil,nilerr // gracefully return no edits on fix error
+		return nil
 	}
 
 	change := fixResult.Changes[fileKey]
 	if change == nil || !change.HasChanges() || bytes.Equal(change.ModifiedContent, content) {
-		return nil, nil //nolint:nilnil // no changes
+		return nil
 	}
 
 	edits := minimalTextEdit(content, change.ModifiedContent)
 	if len(edits) == 0 {
-		return nil, nil //nolint:nilnil // no effective changes
+		return nil
 	}
-	return edits, nil
+	return edits
 }
 
 func minimalTextEdit(original, modified []byte) []*protocol.TextEdit {

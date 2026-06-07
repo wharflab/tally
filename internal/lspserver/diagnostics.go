@@ -570,7 +570,7 @@ func convertDiagnostics(violations []rules.Violation) []*protocol.Diagnostic {
 			Severity: ptrTo(severityToLSP(v.Severity)),
 			Source:   ptrTo(source),
 			Code:     &protocol.IntegerOrString{String: ptrTo(v.RuleCode)},
-			Message:  v.Message,
+			Message:  plainDiagnosticMessage(v.Message),
 		}
 		if v.Invocation != nil {
 			data := any(map[string]any{

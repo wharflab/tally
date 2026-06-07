@@ -867,6 +867,82 @@ func TestLSP_FormattingRealWorld(t *testing.T) {
 	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, fixed)
 }
 
+func TestLSP_RangeFormattingFixesOnlyOverlappingViolations(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	// Majority uppercase, two lowercase outliers on lines 1 (run) and 2 (copy).
+	// The range covers only the COPY line — the casing fix for the RUN line
+	// must not bleed into the response.
+	original := "FROM alpine:3.18\nRUN apk add curl\nrun echo first\ncopy . /app\n"
+
+	uri := "file:///tmp/test-range-formatting/Dockerfile"
+	ts.openDocument(t, uri, original)
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	// Format only line 3 (0-based) — the COPY line.
+	var edits []textEdit
+	err := ts.conn.Call(ctx, "textDocument/rangeFormatting", &documentRangeFormattingParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Range: lspRange{
+			Start: position{Line: 3, Character: 0},
+			End:   position{Line: 4, Character: 0},
+		},
+		Options: formattingOptions{TabSize: 4, InsertSpaces: true},
+	}).Await(ctx, &edits)
+	require.NoError(t, err)
+	require.NotEmpty(t, edits, "expected an edit for the COPY casing fix")
+
+	fixed := applyEdits(t, uri, original, edits)
+
+	// Only COPY should be upper-cased; the lowercase `run` line stays untouched.
+	assert.Contains(t, fixed, "\nrun echo first\n", "lowercase RUN outside the range must not be touched")
+	assert.Contains(t, fixed, "\nCOPY . /app\n", "COPY inside the range should be upper-cased")
+}
+
+func TestLSP_RangesFormattingHandlesMultipleNonContiguousRanges(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	// Majority uppercase (4 upper vs 3 lower). Three lowercase outliers (run,
+	// workdir, copy) all trigger ConsistentInstructionCasing fixes. Ranges cover
+	// the `run` line and the `copy` line while skipping `workdir` in between.
+	original := "FROM alpine:3.18\nRUN apk add curl\nCMD [\"sh\"]\nLABEL a=b\n" +
+		"run echo first\nworkdir /app\ncopy . /app\n"
+
+	uri := "file:///tmp/test-ranges-formatting/Dockerfile"
+	ts.openDocument(t, uri, original)
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var edits []textEdit
+	err := ts.conn.Call(ctx, "textDocument/rangesFormatting", &documentRangesFormattingParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Ranges: []lspRange{
+			// `run echo first` line.
+			{Start: position{Line: 4, Character: 0}, End: position{Line: 5, Character: 0}},
+			// `copy . /app` line.
+			{Start: position{Line: 6, Character: 0}, End: position{Line: 7, Character: 0}},
+		},
+		Options: formattingOptions{TabSize: 4, InsertSpaces: true},
+	}).Await(ctx, &edits)
+	require.NoError(t, err)
+	require.NotEmpty(t, edits, "expected edits for the two covered lines")
+
+	fixed := applyEdits(t, uri, original, edits)
+
+	assert.Contains(t, fixed, "\nRUN echo first\n", "RUN inside the ranges should be upper-cased")
+	assert.Contains(t, fixed, "\nworkdir /app\n", "WORKDIR outside the ranges must not be touched")
+	assert.Contains(t, fixed, "\nCOPY . /app\n", "COPY inside the ranges should be upper-cased")
+}
+
 func TestLSP_FormattingNoChanges(t *testing.T) {
 	t.Parallel()
 	ts := startTestServer(t)

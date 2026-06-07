@@ -147,7 +147,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (current !== client) {
         return;
       }
-      output.appendLine(`[tally] ${message}`);
+      output.warn(message);
       void promptServerStopped(message);
     });
 
@@ -155,9 +155,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (current !== client) {
         return;
       }
-      output.appendLine(
-        `[tally] language client state: ${stateLabel(oldState)} -> ${stateLabel(newState)}`,
-      );
+      output.debug(`language client state: ${stateLabel(oldState)} -> ${stateLabel(newState)}`);
 
       if (newState === State.Running) {
         clearUnexpectedStopTimer();
@@ -290,8 +288,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         attachClientObservers(client);
         updateLanguageStatusForClient(client);
         applyServerStateUi("starting");
-        output.appendLine(
-          `[tally] starting language server (${runReason}) using ${resolved.source}: ${resolved.executablePath}`,
+        output.info(
+          `starting language server (${runReason}) using ${resolved.source}: ${resolved.executablePath}`,
         );
 
         try {
@@ -318,7 +316,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           updateLanguageStatusForClient();
 
           const msg = err instanceof Error ? err.message : String(err);
-          output.appendLine(`[tally] failed to start language server (${runReason}): ${msg}`);
+          output.error(`failed to start language server (${runReason}): ${msg}`);
           void vscode.window.showErrorMessage(`Tally: failed to start language server: ${msg}`);
         }
       })().finally(() => {
@@ -401,13 +399,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           await editor.update("formatOnSaveMode", originalFormatOnSaveMode, target, true);
           await editor.update("codeActionsOnSave", existing, target, true);
         } catch (restoreErr) {
-          output.appendLine(
-            `[tally] failed to restore editor settings after an error: ${String(restoreErr)}`,
-          );
+          output.error(`failed to restore editor settings after an error: ${String(restoreErr)}`);
         }
 
         const msg = err instanceof Error ? err.message : String(err);
-        output.appendLine(`[tally] failed to configure default Dockerfile formatter: ${msg}`);
+        output.error(`failed to configure default Dockerfile formatter: ${msg}`);
         void vscode.window.showErrorMessage(
           `Tally: failed to configure default Dockerfile formatter: ${msg}`,
         );

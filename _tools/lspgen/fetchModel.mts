@@ -3,7 +3,9 @@ import fs from "node:fs";
 import { pipeline } from 'node:stream/promises';
 import url from "node:url";
 
-const hash = "2c59270f26bff00cc3eef565bacc3f30650dec0c";
+// Pinned to the 3.18.0 release of vscode-languageserver-node
+// (commit dc94993a5e9333f588e1720057c091de795e967a — "Merge 3.18 release into main").
+const hash = "dc94993a5e9333f588e1720057c091de795e967a";
 
 const metaModelURL = `https://raw.githubusercontent.com/microsoft/vscode-languageserver-node/${hash}/protocol/metaModel.json`;
 const metaModelSchemaURL = `https://raw.githubusercontent.com/microsoft/vscode-languageserver-node/${hash}/tools/src/metaModel.ts`;

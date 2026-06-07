@@ -247,6 +247,14 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 		return unmarshalAndCall(req, func(p *protocol.DocumentFormattingParams) (any, error) {
 			return s.handleFormatting(ctx, p)
 		})
+	case string(protocol.MethodTextDocumentRangeFormatting):
+		return unmarshalAndCall(req, func(p *protocol.DocumentRangeFormattingParams) (any, error) {
+			return s.handleRangeFormatting(ctx, p)
+		})
+	case string(protocol.MethodTextDocumentRangesFormatting):
+		return unmarshalAndCall(req, func(p *protocol.DocumentRangesFormattingParams) (any, error) {
+			return s.handleRangesFormatting(ctx, p)
+		})
 	case string(protocol.MethodTextDocumentSemanticTokensFull):
 		return unmarshalAndCall(req, func(p *protocol.SemanticTokensParams) (any, error) {
 			return s.handleSemanticTokensFull(ctx, p)
@@ -429,6 +437,16 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 		params.Capabilities.Window.ShowDocument != nil {
 		s.showDocumentSupported = params.Capabilities.Window.ShowDocument.Support
 	}
+
+	// LSP 3.18: server may attach CodeActionKindDocumentation; only emit when
+	// the client advertises documentationSupport, otherwise it's silently dropped.
+	codeActionDocSupported := false
+	if params.Capabilities != nil &&
+		params.Capabilities.TextDocument != nil &&
+		params.Capabilities.TextDocument.CodeAction != nil &&
+		params.Capabilities.TextDocument.CodeAction.DocumentationSupport != nil {
+		codeActionDocSupported = *params.Capabilities.TextDocument.CodeAction.DocumentationSupport
+	}
 	if params.InitializationOptions != nil {
 		if next, ok := parseClientSettings(*params.InitializationOptions); ok {
 			s.settingsMu.Lock()
@@ -451,16 +469,19 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 				},
 			},
 			CodeActionProvider: &protocol.BooleanOrCodeActionOptions{
-				CodeActionOptions: &protocol.CodeActionOptions{
-					CodeActionKinds: new([]protocol.CodeActionKind{
-						protocol.CodeActionKindQuickFix,
-						suppressCodeActionKind,
-						"source.fixAll.tally",
-					}),
-				},
+				CodeActionOptions: codeActionOptions(codeActionDocSupported),
 			},
 			DocumentFormattingProvider: &protocol.BooleanOrDocumentFormattingOptions{
 				Boolean: new(true),
+			},
+			// LSP 3.18: rangesSupport advertises the new textDocument/rangesFormatting
+			// endpoint alongside the older single-range rangeFormatting. Both reuse the
+			// same lint/fix pipeline as full-document formatting, restricted to the
+			// supplied range(s).
+			DocumentRangeFormattingProvider: &protocol.BooleanOrDocumentRangeFormattingOptions{
+				DocumentRangeFormattingOptions: &protocol.DocumentRangeFormattingOptions{
+					RangesSupport: new(true),
+				},
 			},
 			SemanticTokensProvider: &protocol.SemanticTokensOptionsOrRegistrationOptions{
 				Options: &protocol.SemanticTokensOptions{

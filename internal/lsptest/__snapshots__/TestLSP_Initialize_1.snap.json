@@ -13,6 +13,9 @@
    "workspaceDiagnostics": false
   },
   "documentFormattingProvider": true,
+  "documentRangeFormattingProvider": {
+   "rangesSupport": true
+  },
   "executeCommandProvider": {
    "commands": [
     "tally.applyAllFixes",
