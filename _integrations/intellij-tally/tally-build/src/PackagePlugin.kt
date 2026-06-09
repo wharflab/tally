@@ -85,10 +85,21 @@ fun packagePlugin(
  * commons-compress writes; `java.util.zip.ZipOutputStream` does not). Files
  * with no POSIX view (Windows hosts) fall back to `0644`/`0755` based on
  * directory-vs-file.
+ *
+ * The archive is written through the seekable [Path] constructor, NOT an
+ * `OutputStream`. That distinction is load-bearing: given a non-seekable
+ * stream, commons-compress falls back to *streaming mode* and emits a data
+ * descriptor (general-purpose bit 3) for every entry, zeroing the size/CRC
+ * fields in each local file header. The JetBrains Marketplace upload + zip
+ * signing pipeline rejects such archives ("The plugin archive file cannot be
+ * extracted") even though central-directory readers (unzip, jar, the plugin
+ * verifier) accept them. With a seekable target, commons-compress backfills
+ * the real CRC/sizes into the local headers and writes a conventional archive
+ * matching the previous `zip`-built layout.
  */
 @OptIn(ExperimentalPathApi::class)
 private fun zipDirectory(source: Path, target: Path) {
-    ZipArchiveOutputStream(target.outputStream().buffered()).use { zout ->
+    ZipArchiveOutputStream(target).use { zout ->
         source.walk(PathWalkOption.INCLUDE_DIRECTORIES)
             .filter { it != source }
             .sortedBy { it.relativeTo(source).toString() }
@@ -98,6 +109,11 @@ private fun zipDirectory(source: Path, target: Path) {
                 val entryName = if (isDir) "$rel/" else rel
                 val entry = ZipArchiveEntry(entryName).apply {
                     unixMode = unixModeFor(path, isDir)
+                    // Store (not deflate) empty directory entries, matching a
+                    // conventional `zip` layout. Deflating zero-byte dirs only
+                    // existed because streaming mode defaulted everything to
+                    // DEFLATED.
+                    if (isDir) method = ZipArchiveEntry.STORED
                 }
                 zout.putArchiveEntry(entry)
                 if (!isDir) Files.newInputStream(path).use { it.copyTo(zout) }
