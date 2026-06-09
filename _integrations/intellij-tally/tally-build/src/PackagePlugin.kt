@@ -112,8 +112,14 @@ private fun zipDirectory(source: Path, target: Path) {
                     // Store (not deflate) empty directory entries, matching a
                     // conventional `zip` layout. Deflating zero-byte dirs only
                     // existed because streaming mode defaulted everything to
-                    // DEFLATED.
-                    if (isDir) method = ZipArchiveEntry.STORED
+                    // DEFLATED. A directory entry has no data, so its size and
+                    // CRC-32 are both 0 — set them explicitly so the local file
+                    // header is written in one pass (no seek-back on close).
+                    if (isDir) {
+                        method = ZipArchiveEntry.STORED
+                        size = 0L
+                        crc = 0L
+                    }
                 }
                 zout.putArchiveEntry(entry)
                 if (!isDir) Files.newInputStream(path).use { it.copyTo(zout) }
