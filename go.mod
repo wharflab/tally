@@ -50,7 +50,7 @@ require (
 	go.bug.st/lsp v0.1.3
 	go.opentelemetry.io/otel v1.44.0
 	go.podman.io/image/v5 v5.40.0
-	go.yaml.in/yaml/v4 v4.0.0-rc.4
+	go.yaml.in/yaml/v4 v4.0.0-rc.5
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
 	golang.org/x/sys v0.45.0
 	gopkg.in/ini.v1 v1.67.3
