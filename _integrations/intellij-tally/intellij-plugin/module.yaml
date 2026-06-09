@@ -51,7 +51,7 @@ plugins:
     # smoke-check against, so we only need one IDE distribution.
     ideArchiveUrl: https://download.jetbrains.com/idea/idea-2025.3.tar.gz
     ideArchiveSha256: 13f4174ba16c1cef04871cb261433536d002586c269a809392c20ee3f94959f5
-    pluginVerifierUrl: https://github.com/JetBrains/intellij-plugin-verifier/releases/download/1.400/verifier-cli-1.400-all.jar
-    pluginVerifierSha256: 11865375fd0d7008164ba3500351e4d8fe475ba89ee18371ba9668ef33ecffa8
+    pluginVerifierUrl: https://github.com/JetBrains/intellij-plugin-verifier/releases/download/1.405/verifier-cli-1.405-all.jar
+    pluginVerifierSha256: 30625df0d376f5a6d4cecfa8a8b932b176b635eee4959d4fab6e17fa17a3291d
     ktlintVersion: "1.5.0"
     ktlintSha256: a16be01dcc480aab2f55f444b620142152f66e31564b3b9376506d624c28a2ad

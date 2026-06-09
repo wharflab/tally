@@ -64,8 +64,11 @@ package-lock.json
 # Kotlin Toolchain build directory (replaces the legacy bash .cache/out/dist
 # layout). dist/ holds the published plugin zip; build/ is all transient
 # state — Amper task outputs, downloaded toolchains, logs, incremental state.
+# bundled/ holds the platform binaries CI copies in before packaging
+# (~400MB across six targets); it is generated, never committed.
 _integrations/intellij-tally/build/
 _integrations/intellij-tally/dist/
+_integrations/intellij-tally/bundled/
 _integrations/zed-tally/target/
 verification-*/
 packaging/npm/**/bin/tally*
