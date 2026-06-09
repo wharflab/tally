@@ -15,7 +15,8 @@ Install tally globally, make sure `docker info` works, then ask tally to registe
 <CodeGroup>
 
 ```bash Homebrew
-brew install wharflab/tap/tally
+brew trust --formula wharflab/tap/tally
+brew install --require-sha wharflab/tap/tally
 tally register-docker-plugin
 ```
 

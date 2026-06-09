@@ -8,7 +8,8 @@ tally is a single self-contained binary. Pick the method that fits your environm
 <CodeGroup>
 
 ```bash Homebrew
-brew install wharflab/tap/tally
+brew trust --formula wharflab/tap/tally
+brew install --require-sha wharflab/tap/tally
 ```
 
 ```bash mise
@@ -48,7 +49,8 @@ go install github.com/wharflab/tally@latest
 ## Homebrew (macOS/Linux)
 
 ```bash
-brew install wharflab/tap/tally
+brew trust --formula wharflab/tap/tally
+brew install --require-sha wharflab/tap/tally
 ```
 
 Run `tally register-docker-plugin` if you want Docker to discover the plugin without editing `~/.docker/config.json`.

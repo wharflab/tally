@@ -67,7 +67,8 @@ tally lint --fix Dockerfile
 
     ```bash
     # Homebrew (macOS/Linux)
-    brew install wharflab/tap/tally
+    brew trust --formula wharflab/tap/tally
+    brew install --require-sha wharflab/tap/tally
 
     # mise
     mise use -g github:wharflab/tally@latest

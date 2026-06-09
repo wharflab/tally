@@ -9,7 +9,8 @@ description: "Lint your first Dockerfile in under a minute."
 
     <CodeGroup>
       ```bash Homebrew
-      brew install wharflab/tap/tally
+      brew trust --formula wharflab/tap/tally
+      brew install --require-sha wharflab/tap/tally
       ```
       ```bash mise
       mise use -g github:wharflab/tally@latest
