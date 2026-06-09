@@ -12,9 +12,11 @@
   "skipWebFetchPreflight": true,
   "permissions": {
     "allow": [
-      "mcp__*",
+      "mcp__exa__*",
+      "mcp__tavily__*",
+      "mcp__plugin_serena_serena__*",
+      "mcp__plugin_mintlify_Mintlify__*",
       "Bash(gsed:*)",
-      "Bash(git:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(gh:*)",
@@ -38,7 +40,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:pypi.org)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "auto"
   },
   "enableAllProjectMcpServers": true,
   "hooks": {
