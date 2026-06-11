@@ -26,10 +26,15 @@ internal data class TallyCommand(
  * these from the injected descriptor avoids the internal-API
  * `PluginManager.getPluginByClass`, which the JetBrains Marketplace rejects
  * (and which is unreliable when the IDE runs from sources anyway).
+ *
+ * A real loaded plugin descriptor always supplies both fields, so they are
+ * non-null here. The *absence* of a descriptor (e.g. before injection, or in
+ * a test harness) is modeled by passing a null [TallyPluginInfo] rather than
+ * one with null fields — there is no meaningful partially-populated state.
  */
 internal data class TallyPluginInfo(
-    val path: Path?,
-    val version: String?,
+    val path: Path,
+    val version: String,
 )
 
 internal object TallyBinaryResolver {
@@ -42,7 +47,7 @@ internal object TallyBinaryResolver {
         projectBasePath: String?,
         projectSdkHomePath: String?,
         isTrustedProject: Boolean,
-        plugin: TallyPluginInfo,
+        plugin: TallyPluginInfo?,
     ): TallyCommand? {
         if (settings.importStrategy == TallySettings.IMPORT_STRATEGY_USE_BUNDLED) {
             resolveBundledBinary(plugin)?.let { return it }
@@ -153,8 +158,8 @@ internal object TallyBinaryResolver {
         return null
     }
 
-    private fun resolveBundledBinary(plugin: TallyPluginInfo): TallyCommand? {
-        val pluginPath = plugin.path ?: return null
+    private fun resolveBundledBinary(plugin: TallyPluginInfo?): TallyCommand? {
+        val pluginPath = plugin?.path ?: return null
         val binaryName = if (SystemInfo.isWindows) "tally.exe" else "tally"
         val candidate =
             pluginPath
@@ -183,12 +188,12 @@ internal object TallyBinaryResolver {
 
     private fun compatibleOrNull(
         command: TallyCommand?,
-        plugin: TallyPluginInfo,
+        plugin: TallyPluginInfo?,
     ): TallyCommand? = command?.takeIf { isCompatibleBinary(Paths.get(it.executable), plugin) }
 
-    private fun getMinCompatibleVersion(plugin: TallyPluginInfo): String? {
-        val version = plugin.version
-        if (version.isNullOrBlank() || version.contains("dev")) {
+    private fun getMinCompatibleVersion(plugin: TallyPluginInfo?): String? {
+        val version = plugin?.version ?: return null
+        if (version.isBlank() || version.contains("dev")) {
             return null // dev build – skip version gating
         }
         return version
@@ -196,7 +201,7 @@ internal object TallyBinaryResolver {
 
     private fun isCompatibleBinary(
         path: Path,
-        plugin: TallyPluginInfo,
+        plugin: TallyPluginInfo?,
     ): Boolean {
         val minVersion = getMinCompatibleVersion(plugin) ?: return true
         return try {

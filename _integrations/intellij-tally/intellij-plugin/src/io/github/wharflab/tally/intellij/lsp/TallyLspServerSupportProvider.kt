@@ -46,10 +46,12 @@ internal class TallyLspServerSupportProvider :
                 project.basePath,
                 sdkHomePath,
                 isTrustedProject,
-                TallyPluginInfo(
-                    path = pluginDescriptor?.pluginPath,
-                    version = pluginDescriptor?.version,
-                ),
+                pluginDescriptor?.let {
+                    TallyPluginInfo(
+                        path = it.pluginPath,
+                        version = it.version,
+                    )
+                },
             ) ?: return
         serverStarter.ensureServerStarted(
             TallyLspServerDescriptor(project, command, service.formatOnReformat),
