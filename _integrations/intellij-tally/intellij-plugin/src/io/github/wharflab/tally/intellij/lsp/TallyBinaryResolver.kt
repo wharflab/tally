@@ -4,7 +4,6 @@ import com.google.gson.JsonParser
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.execution.process.CapturingProcessHandler
-import com.intellij.ide.plugins.PluginManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.util.text.VersionComparatorUtil
@@ -20,6 +19,24 @@ internal data class TallyCommand(
     val args: List<String>,
 )
 
+/**
+ * The plugin's own install path and version, captured from the
+ * [com.intellij.openapi.extensions.PluginDescriptor] the platform injects
+ * into [TallyLspServerSupportProvider] (a `PluginAware` extension). Sourcing
+ * these from the injected descriptor avoids the internal-API
+ * `PluginManager.getPluginByClass`, which the JetBrains Marketplace rejects
+ * (and which is unreliable when the IDE runs from sources anyway).
+ *
+ * A real loaded plugin descriptor always supplies both fields, so they are
+ * non-null here. The *absence* of a descriptor (e.g. before injection, or in
+ * a test harness) is modeled by passing a null [TallyPluginInfo] rather than
+ * one with null fields — there is no meaningful partially-populated state.
+ */
+internal data class TallyPluginInfo(
+    val path: Path,
+    val version: String,
+)
+
 internal object TallyBinaryResolver {
     private val LOG = Logger.getInstance(TallyBinaryResolver::class.java)
     private val SERVER_ARGS = listOf("lsp", "--stdio")
@@ -30,20 +47,21 @@ internal object TallyBinaryResolver {
         projectBasePath: String?,
         projectSdkHomePath: String?,
         isTrustedProject: Boolean,
+        plugin: TallyPluginInfo?,
     ): TallyCommand? {
         if (settings.importStrategy == TallySettings.IMPORT_STRATEGY_USE_BUNDLED) {
-            resolveBundledBinary()?.let { return it }
+            resolveBundledBinary(plugin)?.let { return it }
             return null
         }
 
         resolveExplicitPaths(settings.executablePaths, projectBasePath, isTrustedProject)
             ?.let { return it }
         if (isTrustedProject) {
-            compatibleOrNull(resolveFromPath())?.let { return it }
-            compatibleOrNull(resolveFromInterpreterDirectory(projectSdkHomePath))?.let { return it }
-            compatibleOrNull(resolveFromProjectVenv(projectBasePath))?.let { return it }
+            compatibleOrNull(resolveFromPath(), plugin)?.let { return it }
+            compatibleOrNull(resolveFromInterpreterDirectory(projectSdkHomePath), plugin)?.let { return it }
+            compatibleOrNull(resolveFromProjectVenv(projectBasePath), plugin)?.let { return it }
         }
-        return resolveBundledBinary()
+        return resolveBundledBinary(plugin)
     }
 
     private fun resolveExplicitPaths(
@@ -140,13 +158,11 @@ internal object TallyBinaryResolver {
         return null
     }
 
-    private fun resolveBundledBinary(): TallyCommand? {
-        val descriptor =
-            PluginManager.getPluginByClass(TallyBinaryResolver::class.java)
-                ?: return null
+    private fun resolveBundledBinary(plugin: TallyPluginInfo?): TallyCommand? {
+        val pluginPath = plugin?.path ?: return null
         val binaryName = if (SystemInfo.isWindows) "tally.exe" else "tally"
         val candidate =
-            descriptor.pluginPath
+            pluginPath
                 .resolve("bin")
                 .resolve(platformFolder())
                 .resolve(normalizeArch())
@@ -170,21 +186,24 @@ internal object TallyBinaryResolver {
             args = SERVER_ARGS,
         )
 
-    private fun compatibleOrNull(command: TallyCommand?): TallyCommand? = command?.takeIf { isCompatibleBinary(Paths.get(it.executable)) }
+    private fun compatibleOrNull(
+        command: TallyCommand?,
+        plugin: TallyPluginInfo?,
+    ): TallyCommand? = command?.takeIf { isCompatibleBinary(Paths.get(it.executable), plugin) }
 
-    private fun getMinCompatibleVersion(): String? {
-        val descriptor =
-            PluginManager.getPluginByClass(TallyBinaryResolver::class.java)
-                ?: return null
-        val version = descriptor.version
-        if (version.isNullOrBlank() || version.contains("dev")) {
+    private fun getMinCompatibleVersion(plugin: TallyPluginInfo?): String? {
+        val version = plugin?.version ?: return null
+        if (version.isBlank() || version.contains("dev")) {
             return null // dev build – skip version gating
         }
         return version
     }
 
-    private fun isCompatibleBinary(path: Path): Boolean {
-        val minVersion = getMinCompatibleVersion() ?: return true
+    private fun isCompatibleBinary(
+        path: Path,
+        plugin: TallyPluginInfo?,
+    ): Boolean {
+        val minVersion = getMinCompatibleVersion(plugin) ?: return true
         return try {
             val commandLine = GeneralCommandLine(path.absolutePathString(), "version", "--json")
             val output = CapturingProcessHandler(commandLine).runProcess(VERSION_CHECK_TIMEOUT_MS.toInt())
