@@ -20,7 +20,7 @@
         "oxfmt": "0.54.0",
         "oxlint": "1.68.0",
         "oxlint-tsgolint": "0.23.0",
-        "vscode-python-envs": "github:microsoft/vscode-python-environments#v1.30.0",
+        "vscode-python-envs": "github:microsoft/vscode-python-environments#v1.34.0",
       },
     },
   },
@@ -182,6 +182,8 @@
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.68.0", "", { "os": "win32", "cpu": "x64" }, "sha512-zg5pA+84AlU6XHJ3ruiRxziO71QTrz8nLsk6u01JGS5+tL9/bnlakFiklFrcy4R1/V7ktWtaNitN3JZWmKnf6g=="],
 
     "@pkgjs/parseargs": ["@pkgjs/parseargs@0.11.0", "", {}, "sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg=="],
+
+    "@renovatebot/pep440": ["@renovatebot/pep440@4.2.4", "", {}, "sha512-r+Pwj9ud/5QOOHoSsD7mWzU0Qkj105UPOyPwihGAtbNCl9pqnWkEDNRM5an63QvsFsS9tt+X3o+npT3AKBiTVg=="],
 
     "@secretlint/config-creator": ["@secretlint/config-creator@10.2.2", "", { "dependencies": { "@secretlint/types": "^10.2.2" } }, "sha512-BynOBe7Hn3LJjb3CqCHZjeNB09s/vgf0baBaHVw67w7gHF0d25c3ZsZ5+vv8TgwSchRdUCRrbbcq5i2B1fJ2QQ=="],
 
@@ -889,7 +891,7 @@
 
     "vscode-languageserver-types": ["vscode-languageserver-types@3.18.0", "", {}, "sha512-8TsGPNMIMiiBdkORgRSvLjuiEIiAFtO+KssmYWxQ+uSVvlf7RjK8YKCOjPzZ+YA04jXEV7+7LvkSmHkhpNS99g=="],
 
-    "vscode-python-envs": ["vscode-python-envs@github:microsoft/vscode-python-environments#0e4c264", { "dependencies": { "@iarna/toml": "^2.2.5", "@vscode/extension-telemetry": "^0.9.7", "@vscode/test-cli": "^0.0.10", "dotenv": "^16.4.5", "fs-extra": "^11.2.0", "stack-trace": "0.0.10", "vscode-jsonrpc": "^9.0.0-next.5", "which": "^4.0.0" } }, "microsoft-vscode-python-environments-0e4c264", "sha512-yJUyJE3MTJYaP9EBa/rmelDF2marz6Ozk8jMjY0F3VdlUOiGF9MBUSkdZjMgLUGN8yhgmRSX2lpvxx7+C7YEPA=="],
+    "vscode-python-envs": ["vscode-python-envs@github:microsoft/vscode-python-environments#b0efa4f", { "dependencies": { "@iarna/toml": "^2.2.5", "@renovatebot/pep440": "^4.2.4", "@vscode/extension-telemetry": "^0.9.7", "@vscode/test-cli": "^0.0.10", "dotenv": "^16.4.5", "fs-extra": "^11.2.0", "stack-trace": "0.0.10", "vscode-jsonrpc": "^9.0.0-next.5", "which": "^4.0.0" } }, "microsoft-vscode-python-environments-b0efa4f", "sha512-UtLJNMq10NJo3ozrtlSoA/5Ht/lsRmzqhCK1EbyI0vZU3fW/QPgHB5qHJm4UGLukJtn37H5wfQQgHkhVLkHvww=="],
 
     "whatwg-encoding": ["whatwg-encoding@3.1.1", "", { "dependencies": { "iconv-lite": "0.6.3" } }, "sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ=="],
 
