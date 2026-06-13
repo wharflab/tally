@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	charm.land/bubbles/v2 v2.1.0
-	charm.land/lipgloss/v2 v2.0.3
+	charm.land/lipgloss/v2 v2.0.4
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/bluekeyes/go-gitdiff v0.8.1
