@@ -16,6 +16,7 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 	bunRoot := filepath.Join(home, ".bun", "install", "global")
 	bunBin := filepath.Join(home, ".bun", "bin")
 	uvToolDir := filepath.Join(home, ".local", "share", "uv", "tools")
+	miseInstalls := filepath.Join(home, ".local", "share", "mise", "installs")
 	virtualEnv := filepath.Join(home, "work", "project", ".custom-env")
 	registrar := dockerPluginRegistrar{
 		goos:       "linux",
@@ -132,6 +133,16 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 				"tally",
 			),
 			want: "uv tool",
+		},
+		{
+			name: "mise github backend bare binary",
+			path: filepath.Join(miseInstalls, "github-wharflab-tally", "latest", "tally"),
+			want: "mise",
+		},
+		{
+			name: "mise asdf backend bin layout",
+			path: filepath.Join(miseInstalls, "tally", "0.44.2", "bin", "tally"),
+			want: "mise",
 		},
 		{
 			name: "python package install",

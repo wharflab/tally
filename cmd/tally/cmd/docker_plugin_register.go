@@ -95,8 +95,9 @@ func registerDockerPluginCommand() *cobra.Command {
 
 The command registers docker-lint in Docker's per-user CLI plugin directory.
 It does not download Docker, Docker Compose, Docker Buildx, or another tally
-binary. It only runs from persistent global installs such as Homebrew, WinGet,
-global npm or Bun installs, uv tool installs, or a direct global binary.`,
+binary. It only runs from persistent global installs such as Homebrew, mise,
+WinGet, global npm or Bun installs, uv tool installs, or a direct global
+binary.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registrar := newDockerPluginRegistrar()
 			out := cmd.OutOrStdout()
@@ -435,6 +436,8 @@ func (r dockerPluginRegistrar) classifySource(source string) (string, error) {
 	}
 
 	switch {
+	case r.isMisePath(source):
+		return "mise", nil
 	case looksLikeHomebrewPath(source):
 		return "Homebrew", nil
 	case looksLikeWingetPath(source):
@@ -699,6 +702,44 @@ func (r dockerPluginRegistrar) uvToolDirs() []string {
 			filepath.Join(r.homeDir, "Library", "Application Support", "uv", "tools"),
 			filepath.Join(r.homeDir, "AppData", "Roaming", "uv", "tools"),
 		)
+	}
+	return cleanPathList(roots)
+}
+
+func (r dockerPluginRegistrar) isMisePath(path string) bool {
+	for _, root := range r.miseInstallRoots() {
+		if r.pathWithin(path, root) {
+			return true
+		}
+	}
+	return false
+}
+
+// miseInstallRoots resolves the directories under which mise extracts managed
+// tools. mise stores installs in <data dir>/installs; the data dir defaults to
+// $XDG_DATA_HOME/mise (~/.local/share/mise) on Unix and %LOCALAPPDATA%\mise on
+// Windows, and can be overridden with MISE_DATA_DIR.
+func (r dockerPluginRegistrar) miseInstallRoots() []string {
+	var dataDirs []string
+	if v := strings.TrimSpace(os.Getenv("TALLY_MISE_DATA_DIR")); v != "" {
+		dataDirs = appendPathList(dataDirs, v)
+	}
+	if v := strings.TrimSpace(os.Getenv("MISE_DATA_DIR")); v != "" {
+		dataDirs = appendPathList(dataDirs, v)
+	}
+	if v := strings.TrimSpace(os.Getenv("XDG_DATA_HOME")); v != "" {
+		dataDirs = append(dataDirs, filepath.Join(v, "mise"))
+	}
+	if v := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); v != "" {
+		dataDirs = append(dataDirs, filepath.Join(v, "mise"))
+	}
+	if r.homeDir != "" {
+		dataDirs = append(dataDirs, filepath.Join(r.homeDir, ".local", "share", "mise"))
+	}
+
+	roots := make([]string, 0, len(dataDirs))
+	for _, dir := range dataDirs {
+		roots = append(roots, filepath.Join(dir, "installs"))
 	}
 	return cleanPathList(roots)
 }
