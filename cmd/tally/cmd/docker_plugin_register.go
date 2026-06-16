@@ -29,6 +29,7 @@ const (
 	registrationActionUpgrade       = "Upgrading"
 	installModeCopy                 = "copy"
 	installModeSymlink              = "symlink"
+	sourceKindMise                  = "mise"
 	minimumDockerCLIVersion         = "20.10.0"
 	tallyDockerPluginVendor         = "Wharflab"
 	tallyExecutableBaseName         = "tally"
@@ -437,7 +438,7 @@ func (r dockerPluginRegistrar) classifySource(source string) (string, error) {
 
 	switch {
 	case r.isMisePath(source):
-		return "mise", nil
+		return sourceKindMise, nil
 	case looksLikeHomebrewPath(source):
 		return "Homebrew", nil
 	case looksLikeWingetPath(source):
@@ -716,10 +717,21 @@ func (r dockerPluginRegistrar) isMisePath(path string) bool {
 }
 
 // miseInstallRoots resolves the directories under which mise extracts managed
-// tools. mise stores installs in <data dir>/installs; the data dir defaults to
-// $XDG_DATA_HOME/mise (~/.local/share/mise) on Unix and %LOCALAPPDATA%\mise on
-// Windows, and can be overridden with MISE_DATA_DIR.
+// tools. mise installs tools into MISE_INSTALLS_DIR, which defaults to
+// <data dir>/installs; the data dir defaults to $XDG_DATA_HOME/mise
+// (~/.local/share/mise) on Unix and %LOCALAPPDATA%\mise on Windows, and can be
+// overridden with MISE_DATA_DIR. See https://mise.jdx.dev/directories.html.
 func (r dockerPluginRegistrar) miseInstallRoots() []string {
+	var roots []string
+	// MISE_INSTALLS_DIR overrides the installs location directly, so it is a
+	// root as-is rather than a data dir that gets "installs" appended.
+	if v := strings.TrimSpace(os.Getenv("TALLY_MISE_INSTALLS_DIR")); v != "" {
+		roots = appendPathList(roots, v)
+	}
+	if v := strings.TrimSpace(os.Getenv("MISE_INSTALLS_DIR")); v != "" {
+		roots = appendPathList(roots, v)
+	}
+
 	var dataDirs []string
 	if v := strings.TrimSpace(os.Getenv("TALLY_MISE_DATA_DIR")); v != "" {
 		dataDirs = appendPathList(dataDirs, v)
@@ -740,7 +752,6 @@ func (r dockerPluginRegistrar) miseInstallRoots() []string {
 		)
 	}
 
-	roots := make([]string, 0, len(dataDirs))
 	for _, dir := range dataDirs {
 		roots = append(roots, filepath.Join(dir, "installs"))
 	}
