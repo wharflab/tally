@@ -214,9 +214,20 @@ func TestDockerPluginRegistrarMiseInstallRootsWindowsHomeFallback(t *testing.T) 
 	home := filepath.Join(string(filepath.Separator), "Users", "me")
 	registrar := dockerPluginRegistrar{goos: windowsGOOS, homeDir: home}
 
+	// miseInstallRoots normalizes via cleanPathList (filepath.Abs -> Clean), which
+	// on Windows resolves a drive-less rooted path against the current drive.
+	// Mirror that here so the expected values match regardless of platform.
+	normalize := func(elems ...string) string {
+		abs, err := filepath.Abs(filepath.Join(elems...))
+		if err != nil {
+			t.Fatalf("filepath.Abs(%v): %v", elems, err)
+		}
+		return filepath.Clean(abs)
+	}
+
 	roots := registrar.miseInstallRoots()
-	wantWindows := filepath.Clean(filepath.Join(home, "AppData", "Local", "mise", "installs"))
-	wantUnix := filepath.Clean(filepath.Join(home, ".local", "share", "mise", "installs"))
+	wantWindows := normalize(home, "AppData", "Local", "mise", "installs")
+	wantUnix := normalize(home, ".local", "share", "mise", "installs")
 	if !slices.Contains(roots, wantWindows) {
 		t.Fatalf("miseInstallRoots() = %v, want containing Windows fallback %q", roots, wantWindows)
 	}
