@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -200,6 +201,36 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 				t.Fatalf("classifySource(%q) = %q, want %q", tc.path, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestDockerPluginRegistrarMiseInstallRootsWindowsHomeFallback(t *testing.T) {
+	// Cannot run in parallel: clears env vars that feed miseInstallRoots so the
+	// homeDir fallbacks are exercised in isolation.
+	for _, key := range []string{"TALLY_MISE_DATA_DIR", "MISE_DATA_DIR", "XDG_DATA_HOME", "LOCALAPPDATA"} {
+		t.Setenv(key, "")
+	}
+
+	home := filepath.Join(string(filepath.Separator), "Users", "me")
+	registrar := dockerPluginRegistrar{goos: windowsGOOS, homeDir: home}
+
+	roots := registrar.miseInstallRoots()
+	wantWindows := filepath.Clean(filepath.Join(home, "AppData", "Local", "mise", "installs"))
+	wantUnix := filepath.Clean(filepath.Join(home, ".local", "share", "mise", "installs"))
+	if !slices.Contains(roots, wantWindows) {
+		t.Fatalf("miseInstallRoots() = %v, want containing Windows fallback %q", roots, wantWindows)
+	}
+	if !slices.Contains(roots, wantUnix) {
+		t.Fatalf("miseInstallRoots() = %v, want containing Unix fallback %q", roots, wantUnix)
+	}
+
+	source := filepath.Join(home, "AppData", "Local", "mise", "installs", "github-wharflab-tally", "latest", "tally.exe")
+	got, err := registrar.classifySource(source)
+	if err != nil {
+		t.Fatalf("classifySource(%q): %v", source, err)
+	}
+	if got != "mise" {
+		t.Fatalf("classifySource(%q) = %q, want %q", source, got, "mise")
 	}
 }
 

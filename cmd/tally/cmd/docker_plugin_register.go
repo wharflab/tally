@@ -734,7 +734,10 @@ func (r dockerPluginRegistrar) miseInstallRoots() []string {
 		dataDirs = append(dataDirs, filepath.Join(v, "mise"))
 	}
 	if r.homeDir != "" {
-		dataDirs = append(dataDirs, filepath.Join(r.homeDir, ".local", "share", "mise"))
+		dataDirs = append(dataDirs,
+			filepath.Join(r.homeDir, ".local", "share", "mise"),
+			filepath.Join(r.homeDir, "AppData", "Local", "mise"),
+		)
 	}
 
 	roots := make([]string, 0, len(dataDirs))
