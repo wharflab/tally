@@ -98,8 +98,7 @@ func TestValidateFile_ExecutableBit(t *testing.T) {
 	}
 
 	err := ValidateFile(f, 0)
-	var execErr *ExecutableFileError
-	if !errors.As(err, &execErr) {
+	if _, ok := errors.AsType[*ExecutableFileError](err); !ok {
 		t.Fatalf("expected ExecutableFileError, got %v", err)
 	}
 
@@ -136,8 +135,7 @@ func TestValidateFile_UTF8Check(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := ValidateFile(binFile, 0)
-	var utf8Err *NotUTF8Error
-	if !errors.As(err, &utf8Err) {
+	if _, ok := errors.AsType[*NotUTF8Error](err); !ok {
 		t.Fatalf("expected NotUTF8Error for binary file, got %v", err)
 	}
 }
@@ -171,8 +169,7 @@ func TestReadValidatedFile_PreservesValidationErrors(t *testing.T) {
 	}
 
 	_, err := ReadValidatedFile(filePath, 0)
-	var utf8Err *NotUTF8Error
-	if !errors.As(err, &utf8Err) {
+	if _, ok := errors.AsType[*NotUTF8Error](err); !ok {
 		t.Fatalf("expected NotUTF8Error, got %v", err)
 	}
 }

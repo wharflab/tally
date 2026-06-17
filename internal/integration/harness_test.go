@@ -175,8 +175,7 @@ func runFixCase(t *testing.T, tc fixCase) {
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
+		if _, ok := errors.AsType[*exec.ExitError](err); !ok {
 			t.Fatalf("lint --fix command failed to run: %v\noutput:\n%s", err, output)
 		}
 		// Non-zero exits are valid for fix runs when unfixed violations remain.

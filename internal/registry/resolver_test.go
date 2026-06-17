@@ -82,8 +82,7 @@ func TestAsyncImageResolver_NotFoundError_NoRetry(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	var notFound *NotFoundError
-	if !errors.As(err, &notFound) {
+	if _, ok := errors.AsType[*NotFoundError](err); !ok {
 		t.Errorf("expected NotFoundError, got %T: %v", err, err)
 	}
 	if callCount != 1 {
@@ -110,8 +109,7 @@ func TestAsyncImageResolver_AuthError_RetriesOnce(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	var authErr *AuthError
-	if !errors.As(err, &authErr) {
+	if _, ok := errors.AsType[*AuthError](err); !ok {
 		t.Errorf("expected AuthError, got %T: %v", err, err)
 	}
 	// Should retry once: 1 original + 1 retry = 2 calls.

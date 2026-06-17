@@ -148,8 +148,7 @@ func TestContainersResolver_MockRegistry_PlatformMismatch(t *testing.T) {
 		t.Fatal("expected PlatformMismatchError, got nil")
 	}
 
-	var platErr *PlatformMismatchError
-	if !errors.As(err, &platErr) {
+	if _, ok := errors.AsType[*PlatformMismatchError](err); !ok {
 		t.Fatalf("expected PlatformMismatchError, got %T: %v", err, err)
 	}
 	// Partial config should still have the actual platform.
