@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -16,6 +17,7 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 	bunRoot := filepath.Join(home, ".bun", "install", "global")
 	bunBin := filepath.Join(home, ".bun", "bin")
 	uvToolDir := filepath.Join(home, ".local", "share", "uv", "tools")
+	miseInstalls := filepath.Join(home, ".local", "share", "mise", "installs")
 	virtualEnv := filepath.Join(home, "work", "project", ".custom-env")
 	registrar := dockerPluginRegistrar{
 		goos:       "linux",
@@ -134,6 +136,16 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 			want: "uv tool",
 		},
 		{
+			name: "mise github backend bare binary",
+			path: filepath.Join(miseInstalls, "github-wharflab-tally", "latest", "tally"),
+			want: sourceKindMise,
+		},
+		{
+			name: "mise asdf backend bin layout",
+			path: filepath.Join(miseInstalls, "tally", "0.44.2", "bin", "tally"),
+			want: sourceKindMise,
+		},
+		{
 			name: "python package install",
 			path: filepath.Join(
 				home,
@@ -189,6 +201,129 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 				t.Fatalf("classifySource(%q) = %q, want %q", tc.path, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestDockerPluginRegistrarMiseInstallRootsWindowsHomeFallback(t *testing.T) {
+	// Cannot run in parallel: clears env vars that feed miseInstallRoots so the
+	// homeDir fallbacks are exercised in isolation.
+	for _, key := range []string{"TALLY_MISE_DATA_DIR", "MISE_DATA_DIR", "XDG_DATA_HOME", "LOCALAPPDATA"} {
+		t.Setenv(key, "")
+	}
+
+	home := filepath.Join(string(filepath.Separator), "Users", "me")
+	registrar := dockerPluginRegistrar{goos: windowsGOOS, homeDir: home}
+
+	// miseInstallRoots normalizes via cleanPathList (filepath.Abs -> Clean), which
+	// on Windows resolves a drive-less rooted path against the current drive.
+	// Mirror that here so the expected values match regardless of platform.
+	normalize := func(elems ...string) string {
+		abs, err := filepath.Abs(filepath.Join(elems...))
+		if err != nil {
+			t.Fatalf("filepath.Abs(%v): %v", elems, err)
+		}
+		return filepath.Clean(abs)
+	}
+
+	roots := registrar.miseInstallRoots()
+	wantWindows := normalize(home, "AppData", "Local", "mise", "installs")
+	wantUnix := normalize(home, ".local", "share", "mise", "installs")
+	if !slices.Contains(roots, wantWindows) {
+		t.Fatalf("miseInstallRoots() = %v, want containing Windows fallback %q", roots, wantWindows)
+	}
+	if !slices.Contains(roots, wantUnix) {
+		t.Fatalf("miseInstallRoots() = %v, want containing Unix fallback %q", roots, wantUnix)
+	}
+
+	source := filepath.Join(home, "AppData", "Local", "mise", "installs", "github-wharflab-tally", "latest", "tally.exe")
+	got, err := registrar.classifySource(source)
+	if err != nil {
+		t.Fatalf("classifySource(%q): %v", source, err)
+	}
+	if got != sourceKindMise {
+		t.Fatalf("classifySource(%q) = %q, want %q", source, got, sourceKindMise)
+	}
+}
+
+func TestDockerPluginRegistrarMiseInstallsDirOverride(t *testing.T) {
+	// Cannot run in parallel: sets/clears env vars that feed miseInstallRoots.
+	installsDir := filepath.Join(t.TempDir(), "opt", "mise-installs")
+	t.Setenv("MISE_INSTALLS_DIR", installsDir)
+	for _, key := range []string{"TALLY_MISE_INSTALLS_DIR", "TALLY_MISE_DATA_DIR", "MISE_DATA_DIR"} {
+		t.Setenv(key, "")
+	}
+
+	registrar := dockerPluginRegistrar{
+		goos:    "linux",
+		homeDir: filepath.Join(t.TempDir(), "home"),
+	}
+
+	// MISE_INSTALLS_DIR is the installs root directly (no "installs" suffix), so
+	// the bare github/ubi layout lives one level under it.
+	source := filepath.Join(installsDir, "github-wharflab-tally", "latest", "tally")
+	got, err := registrar.classifySource(source)
+	if err != nil {
+		t.Fatalf("classifySource(%q): %v", source, err)
+	}
+	if got != sourceKindMise {
+		t.Fatalf("classifySource(%q) = %q, want %q", source, got, sourceKindMise)
+	}
+}
+
+func TestDockerPluginRegistrarMiseSharedInstallDirs(t *testing.T) {
+	// Cannot run in parallel: sets/clears env vars that feed miseInstallRoots.
+	first := filepath.Join(t.TempDir(), "shared-a", "installs")
+	second := filepath.Join(t.TempDir(), "shared-b", "installs")
+	t.Setenv("MISE_SHARED_INSTALL_DIRS", first+string(os.PathListSeparator)+second)
+	for _, key := range []string{"TALLY_MISE_INSTALLS_DIR", "MISE_INSTALLS_DIR", "TALLY_MISE_DATA_DIR", "MISE_DATA_DIR"} {
+		t.Setenv(key, "")
+	}
+
+	registrar := dockerPluginRegistrar{
+		goos:    "linux",
+		homeDir: filepath.Join(t.TempDir(), "home"),
+	}
+
+	// Each shared dir is an installs root directly, so the bare github/ubi layout
+	// lives one level under it.
+	for _, root := range []string{first, second} {
+		source := filepath.Join(root, "github-wharflab-tally", "latest", "tally")
+		got, err := registrar.classifySource(source)
+		if err != nil {
+			t.Fatalf("classifySource(%q): %v", source, err)
+		}
+		if got != sourceKindMise {
+			t.Fatalf("classifySource(%q) = %q, want %q", source, got, sourceKindMise)
+		}
+	}
+}
+
+func TestDockerPluginRegistrarMiseSystemRoot(t *testing.T) {
+	// Cannot run in parallel: clears env vars that feed miseInstallRoots so the
+	// default system root is exercised.
+	for _, key := range []string{
+		"TALLY_MISE_INSTALLS_DIR", "MISE_INSTALLS_DIR", "MISE_SHARED_INSTALL_DIRS",
+		"TALLY_MISE_DATA_DIR", "MISE_DATA_DIR", "MISE_SYSTEM_DATA_DIR",
+	} {
+		t.Setenv(key, "")
+	}
+
+	registrar := dockerPluginRegistrar{
+		goos:    "linux",
+		homeDir: filepath.Join(t.TempDir(), "home"),
+	}
+
+	// mise's default system installs root: /usr/local/share/mise/installs.
+	source := filepath.Join(
+		string(filepath.Separator), "usr", "local", "share", "mise", "installs",
+		"github-wharflab-tally", "latest", "tally",
+	)
+	got, err := registrar.classifySource(source)
+	if err != nil {
+		t.Fatalf("classifySource(%q): %v", source, err)
+	}
+	if got != sourceKindMise {
+		t.Fatalf("classifySource(%q) = %q, want %q", source, got, sourceKindMise)
 	}
 }
 

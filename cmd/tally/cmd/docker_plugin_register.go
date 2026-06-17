@@ -29,6 +29,7 @@ const (
 	registrationActionUpgrade       = "Upgrading"
 	installModeCopy                 = "copy"
 	installModeSymlink              = "symlink"
+	sourceKindMise                  = "mise"
 	minimumDockerCLIVersion         = "20.10.0"
 	tallyDockerPluginVendor         = "Wharflab"
 	tallyExecutableBaseName         = "tally"
@@ -95,8 +96,9 @@ func registerDockerPluginCommand() *cobra.Command {
 
 The command registers docker-lint in Docker's per-user CLI plugin directory.
 It does not download Docker, Docker Compose, Docker Buildx, or another tally
-binary. It only runs from persistent global installs such as Homebrew, WinGet,
-global npm or Bun installs, uv tool installs, or a direct global binary.`,
+binary. It only runs from persistent global installs such as Homebrew, mise,
+WinGet, global npm or Bun installs, uv tool installs, or a direct global
+binary.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registrar := newDockerPluginRegistrar()
 			out := cmd.OutOrStdout()
@@ -435,6 +437,8 @@ func (r dockerPluginRegistrar) classifySource(source string) (string, error) {
 	}
 
 	switch {
+	case r.isMisePath(source):
+		return sourceKindMise, nil
 	case looksLikeHomebrewPath(source):
 		return "Homebrew", nil
 	case looksLikeWingetPath(source):
@@ -699,6 +703,68 @@ func (r dockerPluginRegistrar) uvToolDirs() []string {
 			filepath.Join(r.homeDir, "Library", "Application Support", "uv", "tools"),
 			filepath.Join(r.homeDir, "AppData", "Roaming", "uv", "tools"),
 		)
+	}
+	return cleanPathList(roots)
+}
+
+func (r dockerPluginRegistrar) isMisePath(path string) bool {
+	for _, root := range r.miseInstallRoots() {
+		if r.pathWithin(path, root) {
+			return true
+		}
+	}
+	return false
+}
+
+// miseInstallRoots resolves the directories under which mise extracts managed
+// tools. mise installs tools into MISE_INSTALLS_DIR, which defaults to
+// <data dir>/installs; the data dir defaults to $XDG_DATA_HOME/mise
+// (~/.local/share/mise) on Unix and %LOCALAPPDATA%\mise on Windows, and can be
+// overridden with MISE_DATA_DIR. mise also reads tools from shared install dirs
+// (MISE_SHARED_INSTALL_DIRS) and a system root (MISE_SYSTEM_DATA_DIR/installs,
+// default /usr/local/share/mise/installs). See
+// https://mise.jdx.dev/directories.html and
+// https://mise.jdx.dev/configuration/settings.html#shared_install_dirs.
+func (r dockerPluginRegistrar) miseInstallRoots() []string {
+	var roots []string
+	// These point directly at installs dirs, so they are roots as-is rather than
+	// data dirs that get "installs" appended. MISE_SHARED_INSTALL_DIRS is an
+	// OS-path-separated list, which appendPathList splits.
+	for _, env := range []string{"TALLY_MISE_INSTALLS_DIR", "MISE_INSTALLS_DIR", "MISE_SHARED_INSTALL_DIRS"} {
+		if v := strings.TrimSpace(os.Getenv(env)); v != "" {
+			roots = appendPathList(roots, v)
+		}
+	}
+
+	var dataDirs []string
+	if v := strings.TrimSpace(os.Getenv("TALLY_MISE_DATA_DIR")); v != "" {
+		dataDirs = appendPathList(dataDirs, v)
+	}
+	if v := strings.TrimSpace(os.Getenv("MISE_DATA_DIR")); v != "" {
+		dataDirs = appendPathList(dataDirs, v)
+	}
+	if v := strings.TrimSpace(os.Getenv("XDG_DATA_HOME")); v != "" {
+		dataDirs = append(dataDirs, filepath.Join(v, "mise"))
+	}
+	if v := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); v != "" {
+		dataDirs = append(dataDirs, filepath.Join(v, "mise"))
+	}
+	if r.homeDir != "" {
+		dataDirs = append(dataDirs,
+			filepath.Join(r.homeDir, ".local", "share", "mise"),
+			filepath.Join(r.homeDir, "AppData", "Local", "mise"),
+		)
+	}
+	// mise checks the system data dir automatically; it defaults to
+	// /usr/local/share/mise on Unix.
+	if v := strings.TrimSpace(os.Getenv("MISE_SYSTEM_DATA_DIR")); v != "" {
+		dataDirs = appendPathList(dataDirs, v)
+	} else if r.goos != windowsGOOS {
+		dataDirs = append(dataDirs, filepath.Join(string(filepath.Separator), "usr", "local", "share", "mise"))
+	}
+
+	for _, dir := range dataDirs {
+		roots = append(roots, filepath.Join(dir, "installs"))
 	}
 	return cleanPathList(roots)
 }

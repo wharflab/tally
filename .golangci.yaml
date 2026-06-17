@@ -173,6 +173,12 @@ linters:
           - paralleltest
         path: "internal/fix/(resolver|fixer)_test\\.go"
         text: "TestResolverRegistry|TestRegisterResolver_Duplicate|TestFixer_Apply_AsyncFix|TestFixer_Apply_DefaultConcurrency"
+      # paralleltest: these mise tests mutate env vars via t.Setenv, which forbids
+      # t.Parallel
+      - linters:
+          - paralleltest
+        path: "cmd/tally/cmd/docker_plugin_register_test\\.go"
+        text: "TestDockerPluginRegistrarMise(InstallRootsWindowsHomeFallback|InstallsDirOverride|SharedInstallDirs|SystemRoot)"
       # dupl: allow duplicate code in tests (table-driven test patterns)
       - linters:
           - dupl
