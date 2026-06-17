@@ -270,6 +270,63 @@ func TestDockerPluginRegistrarMiseInstallsDirOverride(t *testing.T) {
 	}
 }
 
+func TestDockerPluginRegistrarMiseSharedInstallDirs(t *testing.T) {
+	// Cannot run in parallel: sets/clears env vars that feed miseInstallRoots.
+	first := filepath.Join(t.TempDir(), "shared-a", "installs")
+	second := filepath.Join(t.TempDir(), "shared-b", "installs")
+	t.Setenv("MISE_SHARED_INSTALL_DIRS", first+string(os.PathListSeparator)+second)
+	for _, key := range []string{"TALLY_MISE_INSTALLS_DIR", "MISE_INSTALLS_DIR", "TALLY_MISE_DATA_DIR", "MISE_DATA_DIR"} {
+		t.Setenv(key, "")
+	}
+
+	registrar := dockerPluginRegistrar{
+		goos:    "linux",
+		homeDir: filepath.Join(t.TempDir(), "home"),
+	}
+
+	// Each shared dir is an installs root directly, so the bare github/ubi layout
+	// lives one level under it.
+	for _, root := range []string{first, second} {
+		source := filepath.Join(root, "github-wharflab-tally", "latest", "tally")
+		got, err := registrar.classifySource(source)
+		if err != nil {
+			t.Fatalf("classifySource(%q): %v", source, err)
+		}
+		if got != sourceKindMise {
+			t.Fatalf("classifySource(%q) = %q, want %q", source, got, sourceKindMise)
+		}
+	}
+}
+
+func TestDockerPluginRegistrarMiseSystemRoot(t *testing.T) {
+	// Cannot run in parallel: clears env vars that feed miseInstallRoots so the
+	// default system root is exercised.
+	for _, key := range []string{
+		"TALLY_MISE_INSTALLS_DIR", "MISE_INSTALLS_DIR", "MISE_SHARED_INSTALL_DIRS",
+		"TALLY_MISE_DATA_DIR", "MISE_DATA_DIR", "MISE_SYSTEM_DATA_DIR",
+	} {
+		t.Setenv(key, "")
+	}
+
+	registrar := dockerPluginRegistrar{
+		goos:    "linux",
+		homeDir: filepath.Join(t.TempDir(), "home"),
+	}
+
+	// mise's default system installs root: /usr/local/share/mise/installs.
+	source := filepath.Join(
+		string(filepath.Separator), "usr", "local", "share", "mise", "installs",
+		"github-wharflab-tally", "latest", "tally",
+	)
+	got, err := registrar.classifySource(source)
+	if err != nil {
+		t.Fatalf("classifySource(%q): %v", source, err)
+	}
+	if got != sourceKindMise {
+		t.Fatalf("classifySource(%q) = %q, want %q", source, got, sourceKindMise)
+	}
+}
+
 func TestDockerPluginRegistrarTargetPath(t *testing.T) {
 	t.Parallel()
 

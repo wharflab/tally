@@ -720,16 +720,20 @@ func (r dockerPluginRegistrar) isMisePath(path string) bool {
 // tools. mise installs tools into MISE_INSTALLS_DIR, which defaults to
 // <data dir>/installs; the data dir defaults to $XDG_DATA_HOME/mise
 // (~/.local/share/mise) on Unix and %LOCALAPPDATA%\mise on Windows, and can be
-// overridden with MISE_DATA_DIR. See https://mise.jdx.dev/directories.html.
+// overridden with MISE_DATA_DIR. mise also reads tools from shared install dirs
+// (MISE_SHARED_INSTALL_DIRS) and a system root (MISE_SYSTEM_DATA_DIR/installs,
+// default /usr/local/share/mise/installs). See
+// https://mise.jdx.dev/directories.html and
+// https://mise.jdx.dev/configuration/settings.html#shared_install_dirs.
 func (r dockerPluginRegistrar) miseInstallRoots() []string {
 	var roots []string
-	// MISE_INSTALLS_DIR overrides the installs location directly, so it is a
-	// root as-is rather than a data dir that gets "installs" appended.
-	if v := strings.TrimSpace(os.Getenv("TALLY_MISE_INSTALLS_DIR")); v != "" {
-		roots = appendPathList(roots, v)
-	}
-	if v := strings.TrimSpace(os.Getenv("MISE_INSTALLS_DIR")); v != "" {
-		roots = appendPathList(roots, v)
+	// These point directly at installs dirs, so they are roots as-is rather than
+	// data dirs that get "installs" appended. MISE_SHARED_INSTALL_DIRS is an
+	// OS-path-separated list, which appendPathList splits.
+	for _, env := range []string{"TALLY_MISE_INSTALLS_DIR", "MISE_INSTALLS_DIR", "MISE_SHARED_INSTALL_DIRS"} {
+		if v := strings.TrimSpace(os.Getenv(env)); v != "" {
+			roots = appendPathList(roots, v)
+		}
 	}
 
 	var dataDirs []string
@@ -750,6 +754,13 @@ func (r dockerPluginRegistrar) miseInstallRoots() []string {
 			filepath.Join(r.homeDir, ".local", "share", "mise"),
 			filepath.Join(r.homeDir, "AppData", "Local", "mise"),
 		)
+	}
+	// mise checks the system data dir automatically; it defaults to
+	// /usr/local/share/mise on Unix.
+	if v := strings.TrimSpace(os.Getenv("MISE_SYSTEM_DATA_DIR")); v != "" {
+		dataDirs = appendPathList(dataDirs, v)
+	} else if r.goos != windowsGOOS {
+		dataDirs = append(dataDirs, filepath.Join(string(filepath.Separator), "usr", "local", "share", "mise"))
 	}
 
 	for _, dir := range dataDirs {
