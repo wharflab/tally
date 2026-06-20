@@ -46,7 +46,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/shellcheck-wasm
         with:
           artifact-name: shellcheck-wasm
@@ -132,7 +132,7 @@ jobs:
             msystem: CLANGARM64
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: ./.github/actions/download-shellcheck-wasm
@@ -823,7 +823,7 @@ jobs:
             binary_name: tally.exe
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: false
       - name: Download signed artifacts
@@ -893,7 +893,7 @@ jobs:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: false
       - name: Download signed artifacts
@@ -993,7 +993,7 @@ jobs:
       JETBRAINS_MARKETPLACE_PR_CHANNEL: ${{ vars.JETBRAINS_MARKETPLACE_PR_CHANNEL }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: false
       - name: Download IntelliJ plugin artifact
@@ -1163,7 +1163,7 @@ jobs:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: false
       - name: Download release dist
@@ -1237,7 +1237,7 @@ jobs:
       NPM_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           lfs: false
@@ -1272,7 +1272,7 @@ jobs:
       PYPI_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0.dev{0}{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
       PYPI_PUBLISH_URL: ${{ github.event_name == 'pull_request' && 'https://test.pypi.org/legacy/' || '' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           lfs: false
@@ -1335,7 +1335,7 @@ jobs:
       GEM_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0.pre.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
       GEM_PUBLISH_DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '0' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           lfs: false
@@ -1366,7 +1366,7 @@ jobs:
             Write-Error "::error::HARBOR_PILOT_APP_ID must be configured to publish WinGet PRs"
           }
       - name: Checkout tally
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         if: github.event_name == 'pull_request' || vars.HARBOR_PILOT_APP_ID != ''
         with:
           lfs: false
@@ -1381,7 +1381,7 @@ jobs:
           owner: wharflab
           repositories: winget-pkgs
       - name: Checkout winget-pkgs fork
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         if: github.event_name != 'pull_request' && vars.HARBOR_PILOT_APP_ID != ''
         with:
           lfs: false
@@ -1389,7 +1389,7 @@ jobs:
           token: ${{ steps.app-token-winget.outputs.token }}
           path: winget-pkgs
       - name: Checkout upstream winget-pkgs (dry run)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         if: github.event_name == 'pull_request'
         with:
           lfs: false
@@ -1511,7 +1511,7 @@ jobs:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
     steps:
       - name: Checkout tally
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         if: github.event_name == 'pull_request' || vars.HARBOR_PILOT_APP_ID != ''
         with:
           lfs: false
@@ -1526,7 +1526,7 @@ jobs:
           owner: wharflab
           repositories: zed-extensions
       - name: Checkout zed-extensions fork
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         if: github.event_name != 'pull_request' && vars.HARBOR_PILOT_APP_ID != ''
         with:
           lfs: false
@@ -1534,7 +1534,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           path: zed-extensions
       - name: Checkout upstream zed-extensions (dry run)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         if: github.event_name == 'pull_request'
         with:
           lfs: false

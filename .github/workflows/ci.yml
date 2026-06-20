@@ -21,7 +21,7 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: ophidiarium/mehen@v1.0.2
@@ -51,14 +51,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/shellcheck-wasm
         with:
           artifact-name: shellcheck-wasm
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -160,7 +160,7 @@ jobs:
     needs: shellcheck-wasm
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/download-shellcheck-wasm
         with:
           artifact-name: shellcheck-wasm
@@ -175,7 +175,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -191,7 +191,7 @@ jobs:
     name: Dead Code Detection
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -207,7 +207,7 @@ jobs:
     env:
       PMD_VERSION: 7.20.0
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Setup PMD
         run: |
           curl -fL "https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip" -o pmd.zip
@@ -247,7 +247,7 @@ jobs:
     name: rumdl markdown lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install uv
         uses: astral-sh/setup-uv@v8.2.0
       - run: uv tool run rumdl==0.2.20 check --output-format github .
