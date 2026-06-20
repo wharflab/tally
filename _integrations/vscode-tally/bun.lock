@@ -20,7 +20,7 @@
         "oxfmt": "0.55.0",
         "oxlint": "1.69.0",
         "oxlint-tsgolint": "0.23.0",
-        "vscode-python-envs": "github:microsoft/vscode-python-environments#v1.34.0",
+        "vscode-python-envs": "github:microsoft/vscode-python-environments#v1.36.0",
       },
     },
   },
@@ -891,7 +891,7 @@
 
     "vscode-languageserver-types": ["vscode-languageserver-types@3.18.0", "", {}, "sha512-8TsGPNMIMiiBdkORgRSvLjuiEIiAFtO+KssmYWxQ+uSVvlf7RjK8YKCOjPzZ+YA04jXEV7+7LvkSmHkhpNS99g=="],
 
-    "vscode-python-envs": ["vscode-python-envs@github:microsoft/vscode-python-environments#b0efa4f", { "dependencies": { "@iarna/toml": "^2.2.5", "@renovatebot/pep440": "^4.2.4", "@vscode/extension-telemetry": "^0.9.7", "@vscode/test-cli": "^0.0.10", "dotenv": "^16.4.5", "fs-extra": "^11.2.0", "stack-trace": "0.0.10", "vscode-jsonrpc": "^9.0.0-next.5", "which": "^4.0.0" } }, "microsoft-vscode-python-environments-b0efa4f", "sha512-UtLJNMq10NJo3ozrtlSoA/5Ht/lsRmzqhCK1EbyI0vZU3fW/QPgHB5qHJm4UGLukJtn37H5wfQQgHkhVLkHvww=="],
+    "vscode-python-envs": ["vscode-python-envs@github:microsoft/vscode-python-environments#54f6628", { "dependencies": { "@iarna/toml": "^2.2.5", "@renovatebot/pep440": "^4.2.4", "@vscode/extension-telemetry": "^0.9.7", "@vscode/test-cli": "^0.0.10", "dotenv": "^16.4.5", "fs-extra": "^11.2.0", "stack-trace": "0.0.10", "vscode-jsonrpc": "^9.0.0-next.5", "which": "^4.0.0" } }, "microsoft-vscode-python-environments-54f6628", "sha512-spHhabzW3lARA3mDbynp/9VGdbERYGqnJ0WwDFgWgwPQzsRvakcmdqvsxoFeVIPuN6aQsRxpa/2dTocy2sVzAQ=="],
 
     "whatwg-encoding": ["whatwg-encoding@3.1.1", "", { "dependencies": { "iconv-lite": "0.6.3" } }, "sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ=="],
 
