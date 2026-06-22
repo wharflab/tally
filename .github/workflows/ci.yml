@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: ophidiarium/mehen@v1.0.2
+      - uses: ophi-dev/mehen@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           paths: |
