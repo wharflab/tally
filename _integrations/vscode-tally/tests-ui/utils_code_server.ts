@@ -154,8 +154,14 @@ async function stopCodeServer(proc: ChildProcess): Promise<void> {
   try {
     await exited;
   } catch {
-    // Didn't exit within the grace period — force it and wait for the real exit.
+    // Didn't exit within the grace period — force it. Attach the listener
+    // before signalling (and re-check exitCode) so the one-shot exit event
+    // can't fire before we're listening and hang the await forever.
+    if (proc.exitCode !== null) {
+      return;
+    }
+    const forcedExit = once(proc, "exit");
     proc.kill("SIGKILL");
-    await once(proc, "exit");
+    await forcedExit;
   }
 }
