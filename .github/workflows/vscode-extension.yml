@@ -35,6 +35,11 @@ jobs:
           node-version: 22
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
+      # code-server's postinstall rebuilds native node modules bundled in
+      # lib/vscode (kerberos -> libkrb5-dev, keytar -> libsecret-1-dev); their
+      # headers are absent on the runner and the build fails hard without them.
+      - name: Install code-server native build deps
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev libsecret-1-dev
       - name: Install extension dependencies
         working-directory: _integrations/vscode-tally
         env:
@@ -105,6 +110,11 @@ jobs:
           node-version: 22
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
+      # code-server's postinstall rebuilds native node modules bundled in
+      # lib/vscode (kerberos -> libkrb5-dev, keytar -> libsecret-1-dev); their
+      # headers are absent on the runner and the build fails hard without them.
+      - name: Install code-server native build deps
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev libsecret-1-dev
       - name: Install extension dependencies
         working-directory: _integrations/vscode-tally
         env:
