@@ -25,10 +25,20 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      # code-server is a devDependency whose postinstall hard-requires Node 22
+      # (it parses the node major out of the npm user-agent string), so the
+      # install step needs the same Node/user-agent setup as the UI job even
+      # though the smoke test itself does not launch code-server.
+      - name: Set up Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
       - name: Install extension dependencies
         working-directory: _integrations/vscode-tally
+        env:
+          npm_config_user_agent: npm/10.0.0 node/v22.0.0
         run: bun install --frozen-lockfile
       - name: Typescript check
         working-directory: _integrations/vscode-tally

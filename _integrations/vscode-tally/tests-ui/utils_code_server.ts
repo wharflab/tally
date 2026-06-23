@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { type AddressInfo, createServer } from "node:net";
 import { join } from "node:path";
 
 // Prefer the published entrypoint; fall back to the `.bin` shim. Launching the
@@ -17,9 +18,24 @@ export interface CodeServerContext {
   userDataDir: string;
 }
 
-function randomPort(): number {
-  // High ephemeral range; collisions across the single worker are unlikely.
-  return 50_000 + Math.floor(Math.random() * 10_000);
+// Ask the OS for a free port by binding to :0, then release it for code-server.
+// There is a small TOCTOU window, but it is far less collision-prone than a
+// random pick and keeps the launch deterministic.
+async function getFreePort(): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const server = createServer();
+    server.unref();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address() as AddressInfo | null;
+      const port = address?.port;
+      if (port) {
+        server.close(() => resolve(port));
+      } else {
+        server.close(() => reject(new Error("failed to allocate a free port")));
+      }
+    });
+  });
 }
 
 function writeSettings(userDataDir: string, tallyBinaryPath: string): void {
@@ -49,7 +65,7 @@ export interface StartCodeServerOptions {
 }
 
 export async function startCodeServer(opts: StartCodeServerOptions): Promise<CodeServerContext> {
-  const port = randomPort();
+  const port = await getFreePort();
   writeSettings(opts.userDataDir, opts.tallyBinaryPath);
 
   const args = [
@@ -121,15 +137,17 @@ export async function stopCodeServer(ctx: CodeServerContext): Promise<void> {
   if (ctx.proc.exitCode !== null || ctx.proc.killed) {
     return;
   }
-  ctx.proc.kill("SIGTERM");
   await new Promise<void>((resolve) => {
     const timer = setTimeout(() => {
       ctx.proc.kill("SIGKILL");
       resolve();
     }, 5_000);
+    // Register the exit listener BEFORE signalling, so an instant exit cannot
+    // fire before we are listening (which would hang until the SIGKILL fallback).
     ctx.proc.once("exit", () => {
       clearTimeout(timer);
       resolve();
     });
+    ctx.proc.kill("SIGTERM");
   });
 }
