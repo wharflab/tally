@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 import { test as setup } from "@playwright/test";
 
@@ -62,8 +62,12 @@ function installVsix(): void {
   const pkg = JSON.parse(readFileSync(join(EXTENSION_ROOT, "package.json"), "utf8")) as {
     version: string;
   };
+  // node's path.join does not treat a leading "/" as an absolute override, so
+  // an absolute VSIX_PATH must be used verbatim rather than joined.
   const vsix = process.env.VSIX_PATH
-    ? join(EXTENSION_ROOT, process.env.VSIX_PATH)
+    ? isAbsolute(process.env.VSIX_PATH)
+      ? process.env.VSIX_PATH
+      : join(EXTENSION_ROOT, process.env.VSIX_PATH)
     : join(EXTENSION_ROOT, `tally-${pkg.version}.vsix`);
 
   if (!existsSync(vsix)) {

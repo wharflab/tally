@@ -146,14 +146,17 @@ jobs:
           name: playwright-test-results
           path: _integrations/vscode-tally/test-results
           retention-days: 7
+      # Only on success: a failed run can leave GOCOVERDIR empty (e.g. setup
+      # never built the binary), and `covdata textfmt` exits non-zero on an
+      # empty dir — which would add a spurious red step to an already-red job.
       - name: Convert coverage
-        if: ${{ !cancelled() }}
+        if: success()
         run: |
           go tool covdata textfmt -i="$GOCOVERDIR" -o=coverage-vscode-ui.txt
           # Force generated code to 100% coverage to avoid skewing project totals.
           bash scripts/filter-go-coverprofile.sh coverage-vscode-ui.txt coverage-vscode-ui.filtered.txt
       - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
+        if: success()
         uses: codecov/codecov-action@v7
         with:
           use_oidc: true

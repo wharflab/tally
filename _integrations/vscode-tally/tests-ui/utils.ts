@@ -3,6 +3,16 @@ import { type Locator, type Page } from "@playwright/test";
 const isMac = process.platform === "darwin";
 
 /**
+ * Rows in the Problems panel. Uses a defensive OR over the markers panel
+ * container classes so the selector survives VS Code version differences.
+ */
+export function problemRows(page: Page): Locator {
+  return page
+    .locator(".markers-panel-container .monaco-list-row")
+    .or(page.locator(".markers-panel .monaco-list-row"));
+}
+
+/**
  * Navigate code-server to a workspace folder and wait for the workbench to be
  * interactive. The readiness gate is a DOM chain (`[role="application"]` →
  * `.monaco-workbench` → `.statusbar`), never `networkidle` — code-server holds

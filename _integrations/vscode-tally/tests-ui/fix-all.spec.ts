@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openFile, openWorkspace, readEditorText, runCommand } from "./utils";
+import { openFile, openWorkspace, problemRows, readEditorText, runCommand } from "./utils";
 
 test("'Tally: Fix all auto-fixable issues' applies fixes to the document", async ({
   sharedCodeServer,
@@ -11,7 +11,7 @@ test("'Tally: Fix all auto-fixable issues' applies fixes to the document", async
 
   // Make sure diagnostics have been computed before invoking the fix command.
   await runCommand(page, "Problems: Focus on Problems View");
-  const rows = page.locator(".markers-panel-container .monaco-list-row");
+  const rows = problemRows(page);
   await expect.poll(() => rows.count(), { timeout: 30_000 }).toBeGreaterThan(0);
   const before = await rows.count();
 

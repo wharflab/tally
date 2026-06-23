@@ -4,7 +4,23 @@ import { join } from "node:path";
 
 import { test as base } from "@playwright/test";
 
-import { type CodeServerContext, startCodeServer, stopCodeServer } from "./utils_code_server";
+import { type CodeServerContext, startCodeServer } from "./utils_code_server";
+
+interface TempDir extends Disposable {
+  path: string;
+}
+
+// A temp dir that removes itself when it leaves a `using` scope, even if the
+// surrounding fixture throws.
+function makeTempDir(prefix: string): TempDir {
+  const path = mkdtempSync(join(tmpdir(), prefix));
+  return {
+    path,
+    [Symbol.dispose]() {
+      rmSync(path, { recursive: true, force: true });
+    },
+  };
+}
 
 // Shared scratch dir populated by extension.setup.ts: the installed extension
 // and the freshly built tally LSP binary.
@@ -28,25 +44,24 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // throwaway user-data dir. The extensions dir is shared and read-only here.
   sharedCodeServer: [
     async ({}, use) => {
-      const userDataDir = mkdtempSync(join(tmpdir(), "tally-e2e-udd-"));
-      const ctx = await startCodeServer({
+      // `using`/`await using` guarantee the temp dir is removed and the server
+      // stopped on scope exit, even if startCodeServer or the test throws.
+      using userData = makeTempDir("tally-e2e-udd-");
+      await using ctx = await startCodeServer({
         extensionsDir: EXTENSIONS_DIR,
-        userDataDir,
+        userDataDir: userData.path,
         tallyBinaryPath: TALLY_BIN,
       });
       await use(ctx);
-      await stopCodeServer(ctx);
-      rmSync(userDataDir, { recursive: true, force: true });
     },
     { scope: "worker" },
   ],
 
   // A fresh project folder per test so edits/fixes never bleed across cases.
   projectDir: async ({}, use) => {
-    const dir = mkdtempSync(join(tmpdir(), "tally-e2e-proj-"));
-    cpSync(FIXTURE_DOCKERFILE, join(dir, "Dockerfile"));
-    await use(dir);
-    rmSync(dir, { recursive: true, force: true });
+    using project = makeTempDir("tally-e2e-proj-");
+    cpSync(FIXTURE_DOCKERFILE, join(project.path, "Dockerfile"));
+    await use(project.path);
   },
 });
 

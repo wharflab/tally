@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openFile, openWorkspace, runCommand } from "./utils";
+import { openFile, openWorkspace, problemRows, runCommand } from "./utils";
 
 test("the quick-fix menu offers a tally code action", async ({
   sharedCodeServer,
@@ -12,7 +12,7 @@ test("the quick-fix menu offers a tally code action", async ({
   // Wait until diagnostics exist before asking for fixes, otherwise the action
   // widget may open with nothing to offer.
   await runCommand(page, "Problems: Focus on Problems View");
-  const rows = page.locator(".markers-panel-container .monaco-list-row");
+  const rows = problemRows(page);
   await expect.poll(() => rows.count(), { timeout: 30_000 }).toBeGreaterThan(0);
 
   // Clicking the casing diagnostic row navigates the editor cursor straight to
@@ -27,7 +27,10 @@ test("the quick-fix menu offers a tally code action", async ({
   const actions = page.locator(".action-widget .monaco-list-row.action");
   await expect(actions.first()).toBeVisible({ timeout: 15_000 });
 
-  // At least one action should be a tally fix — the casing fix uppercases the
-  // instruction, or the "fix all" entry is present.
-  await expect(actions.filter({ hasText: /tally|uppercase|COPY|fix all/i }).first()).toBeVisible();
+  // Require a Tally-specific action so a generic editor action can't satisfy
+  // the assertion. The casing fix's title is "Change 'copy' to 'COPY' to match
+  // majority casing"; tally also contributes "Suppress tally/<rule>" actions.
+  await expect(
+    actions.filter({ hasText: /match majority casing|Suppress tally\//i }).first(),
+  ).toBeVisible();
 });
