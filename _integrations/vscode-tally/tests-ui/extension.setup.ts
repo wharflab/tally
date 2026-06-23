@@ -12,7 +12,10 @@ const REPO_ROOT = join(EXTENSION_ROOT, "..", "..");
 const SETUP_DIR = join(EXTENSION_ROOT, ".test_setup");
 const EXTENSIONS_DIR = join(SETUP_DIR, "extensions");
 const HASH_FILE = join(SETUP_DIR, "vsix.sha256");
-const TALLY_BIN = join(SETUP_DIR, process.platform === "win32" ? "tally.exe" : "tally");
+// Mirror the resolution in fixtures.ts: an explicit TALLY_BIN override wins,
+// otherwise we build into the scratch dir.
+const DEFAULT_TALLY_BIN = join(SETUP_DIR, process.platform === "win32" ? "tally.exe" : "tally");
+const TALLY_BIN = process.env.TALLY_BIN ?? DEFAULT_TALLY_BIN;
 
 // Build flags required to compile tally with the image-handling stubs (see
 // CLAUDE.md). The electron smoke test passes the same set indirectly via make.
@@ -31,6 +34,16 @@ setup("build tally LSP binary + install vsix into code-server", () => {
 });
 
 function buildTallyBinary(): void {
+  // Honor an explicit TALLY_BIN override (documented in DEVELOPMENT.md): reuse
+  // the prebuilt binary instead of running `go build`, which also lets the
+  // suite run where Go/modules are unavailable.
+  if (process.env.TALLY_BIN) {
+    if (!existsSync(TALLY_BIN)) {
+      throw new Error(`TALLY_BIN points at a missing binary: ${TALLY_BIN}`);
+    }
+    return;
+  }
+
   const args = ["build"];
   // Collect coverage from the live LSP process when CI asks for it.
   if (process.env.GOCOVERDIR) {
