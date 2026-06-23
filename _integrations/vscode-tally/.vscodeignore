@@ -4,6 +4,11 @@ bunfig.toml
 bun.lock
 node_modules/**
 test/**
+tests-ui/**
+playwright.config.ts
+playwright-report/**
+test-results/**
+.test_setup/**
 .oxfmtrc.json
 .oxlintrc.json
 bundled/bin/.gitkeep
