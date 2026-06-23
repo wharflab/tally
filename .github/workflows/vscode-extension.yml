@@ -75,3 +75,67 @@ jobs:
           use_oidc: true
           files: coverage-vscode-smoke.filtered.txt
           fail_ci_if_error: true
+  vscode-ui-tests:
+    name: VS Code UI Tests (Playwright)
+    runs-on: ubuntu-latest
+    env:
+      GOCOVERDIR: ${{ github.workspace }}/coverage-vscode-ui
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/shellcheck-wasm
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      # code-server hard-requires Node 22 (its postinstall parses the node major
+      # version out of the npm user-agent string and refuses anything else).
+      - name: Set up Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install extension dependencies
+        working-directory: _integrations/vscode-tally
+        env:
+          # bun does not advertise an npm-compatible user-agent; code-server's
+          # postinstall rejects anything that is not npm*/yarn* and reads the
+          # node major from this same string, so it must say node/v22.
+          npm_config_user_agent: npm/10.0.0 node/v22.0.0
+        run: bun install --frozen-lockfile
+      - name: Install Playwright Chromium
+        working-directory: _integrations/vscode-tally
+        # channel:"chromium" needs the full browser, not the headless shell.
+        run: bunx playwright install --with-deps chromium
+      - name: Prepare coverage dir
+        run: mkdir -p "$GOCOVERDIR"
+      - name: Run Playwright UI tests
+        working-directory: _integrations/vscode-tally
+        run: bun run test:e2e:ui
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: _integrations/vscode-tally/playwright-report
+          retention-days: 7
+      - name: Upload Playwright traces and videos on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-test-results
+          path: _integrations/vscode-tally/test-results
+          retention-days: 7
+      - name: Convert coverage
+        if: ${{ !cancelled() }}
+        run: |
+          go tool covdata textfmt -i="$GOCOVERDIR" -o=coverage-vscode-ui.txt
+          # Force generated code to 100% coverage to avoid skewing project totals.
+          bash scripts/filter-go-coverprofile.sh coverage-vscode-ui.txt coverage-vscode-ui.filtered.txt
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: coverage-vscode-ui.filtered.txt
+          fail_ci_if_error: false

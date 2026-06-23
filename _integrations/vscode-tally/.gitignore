@@ -1,1 +1,5 @@
 LICENSE
+playwright-report/
+test-results/
+.test_setup/
+*.vsix
