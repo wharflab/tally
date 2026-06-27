@@ -48,7 +48,7 @@ jobs:
       # _integrations/intellij-tally/build/, and Amper resolves Maven deps
       # (IntelliJ Platform jars, Kotlin stdlib, lsp4j) into its own cache.
       - name: Cache Kotlin Toolchain and build artifacts
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/JetBrains/Kotlin
