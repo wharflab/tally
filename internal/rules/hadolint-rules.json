@@ -129,7 +129,7 @@
     "code": "DL3022",
     "description": "`COPY --from` should reference a previously defined `FROM` alias",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3022",
-    "severity": "Off"
+    "severity": "Warning"
   },
   {
     "code": "DL3023",
@@ -361,9 +361,21 @@
   },
   {
     "code": "DL3063",
-    "description": "Stage name should not be a reserved word.",
+    "description": "stage name should not be a reserved word",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3063",
     "severity": "Warning"
+  },
+  {
+    "code": "DL3065",
+    "description": "Setting `FROM --platform` to predefined `$TARGETPLATFORM` in is redundant as this is the default behavior",
+    "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3065",
+    "severity": "Warning"
+  },
+  {
+    "code": "DL3066",
+    "description": "Non-numeric user-id may not be resolvable by host system",
+    "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3066",
+    "severity": "Info"
   },
   {
     "code": "DL4000",
