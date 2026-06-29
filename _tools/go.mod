@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/atombender/go-jsonschema v0.23.0
 	github.com/golangci/plugin-module-register v0.1.2
-	golang.org/x/tools v0.46.0
+	golang.org/x/tools v0.47.0
 )
 
 require (
