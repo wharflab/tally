@@ -50,7 +50,7 @@
     "@types/node": "26.0.1",
     "@types/semver": "7.7.1",
     "@types/vscode": "1.106.0",
-    "@typescript/native-preview": "7.0.0-dev.20260629.1",
+    "@typescript/native-preview": "7.0.0-dev.20260630.1",
     "@vscode/test-electron": "3.0.0",
     "@vscode/vsce": "3.9.2",
     "code-server": "4.117.0",
