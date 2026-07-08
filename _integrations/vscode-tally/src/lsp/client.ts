@@ -96,7 +96,7 @@ export class TallyLanguageClient {
       initializationOptions: {
         disablePushDiagnostics: true,
         ...(typeof init.settings === "object" && init.settings !== null
-          ? (init.settings as Record<string, unknown>)
+          ? (init.settings)
           : {}),
       },
       diagnosticPullOptions: {
