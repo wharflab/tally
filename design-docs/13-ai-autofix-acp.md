@@ -494,6 +494,7 @@ Strictly accept one of:
 2. A single fenced code block:
 
    - ```Dockerfile
+
 - content
 
    ```text
