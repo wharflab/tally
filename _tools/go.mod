@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/atombender/go-jsonschema v0.23.0
 	github.com/golangci/plugin-module-register v0.1.2
-	golang.org/x/tools v0.46.0
+	golang.org/x/tools v0.48.0
 )
 
 require (
@@ -15,6 +15,6 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/sanity-io/litter v1.5.8 // indirect
 	github.com/sosodev/duration v1.4.0 // indirect
-	golang.org/x/mod v0.37.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
 )
