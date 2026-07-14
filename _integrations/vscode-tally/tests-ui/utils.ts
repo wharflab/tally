@@ -46,8 +46,12 @@ export async function runCommand(page: Page, command: string): Promise<void> {
   });
 }
 
-/** Open a file via Quick Open (Ctrl/Cmd+P) and wait for the editor to mount. */
+/** Open a file and wait for the editor to mount. */
 export async function openFile(page: Page, filename: string): Promise<void> {
+  if (await openExplorerFile(page, filename)) {
+    return;
+  }
+
   await withPaletteRetry(page, async () => {
     await page.keyboard.press(isMac ? "Meta+P" : "Control+P");
     const input = page
@@ -93,6 +97,18 @@ async function clickQuickInputRow(page: Page, label: string, timeout: number): P
   await row.click({ timeout: 5_000 });
 }
 
+async function openExplorerFile(page: Page, filename: string): Promise<boolean> {
+  const file = page.getByRole("treeitem", { name: filename }).first();
+  try {
+    await file.waitFor({ state: "visible", timeout: 3_000 });
+    await file.click({ timeout: 5_000 });
+    await page.locator(".monaco-editor").first().waitFor({ state: "visible", timeout: 30_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Retry a palette/quick-open interaction up to 3 times, pressing Escape between attempts. */
 async function withPaletteRetry(page: Page, action: () => Promise<void>): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -103,7 +119,10 @@ async function withPaletteRetry(page: Page, action: () => Promise<void>): Promis
       if (attempt === 2) {
         throw err;
       }
-      await page.keyboard.press("Escape");
+      if (page.isClosed()) {
+        throw err;
+      }
+      await page.keyboard.press("Escape").catch(() => {});
       await page.waitForTimeout(500);
     }
   }
