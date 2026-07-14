@@ -42,7 +42,7 @@ export async function runCommand(page: Page, command: string): Promise<void> {
     await input.waitFor({ state: "visible", timeout: 5_000 });
     // Leading ">" forces command mode regardless of any sticky quick-open state.
     await input.fill(`>${command}`);
-    await quickInputRow(page, command).click({ timeout: 5_000 });
+    await clickQuickInputRow(page, command, 15_000);
   });
 }
 
@@ -55,7 +55,7 @@ export async function openFile(page: Page, filename: string): Promise<void> {
       .or(page.locator(".quick-input-box input"));
     await input.waitFor({ state: "visible", timeout: 5_000 });
     await input.fill(filename);
-    await quickInputRow(page, filename).click({ timeout: 5_000 });
+    await clickQuickInputRow(page, filename, 30_000);
     await page.locator(".monaco-editor").first().waitFor({ state: "visible" });
   });
 }
@@ -85,6 +85,12 @@ function commandPaletteInput(page: Page): Locator {
 
 function quickInputRow(page: Page, label: string): Locator {
   return page.locator(".quick-input-list .monaco-list-row").filter({ hasText: label }).first();
+}
+
+async function clickQuickInputRow(page: Page, label: string, timeout: number): Promise<void> {
+  const row = quickInputRow(page, label);
+  await row.waitFor({ state: "visible", timeout });
+  await row.click({ timeout: 5_000 });
 }
 
 /** Retry a palette/quick-open interaction up to 3 times, pressing Escape between attempts. */

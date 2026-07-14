@@ -101,6 +101,7 @@ linters:
       disable:
         - fieldalignment
         - shadow # too strict for idiomatic Go err handling patterns
+        - stdversion # GOEXPERIMENT=jsonv2 intentionally uses experimental stdlib APIs.
       enable-all: true
     lll:
       line-length: 140

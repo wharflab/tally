@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	backoff "github.com/cenkalti/backoff/v6"
+	backoff "github.com/cenkalti/backoff/v7"
 )
 
 // AsyncImageResolver adapts an ImageResolver to the async.Resolver interface

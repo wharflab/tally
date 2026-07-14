@@ -95,9 +95,7 @@ export class TallyLanguageClient {
       // diagnostics to avoid duplicate diagnostics when both are enabled.
       initializationOptions: {
         disablePushDiagnostics: true,
-        ...(typeof init.settings === "object" && init.settings !== null
-          ? (init.settings as Record<string, unknown>)
-          : {}),
+        ...(typeof init.settings === "object" && init.settings !== null ? init.settings : {}),
       },
       diagnosticPullOptions: {
         onChange: true,
