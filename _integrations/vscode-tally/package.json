@@ -281,6 +281,11 @@
     ]
   },
   "activationEvents": [
+    "onCommand:tally.restartServer",
+    "onCommand:tally.showOutput",
+    "onCommand:tally.showLspTrace",
+    "onCommand:tally.applyAllFixes",
+    "onCommand:tally.configureDefaultFormatterForDockerfile",
     "onLanguage:dockerfile",
     "workspaceContains:.tally.toml",
     "workspaceContains:Containerfile*",

@@ -49,6 +49,7 @@ export async function runCommand(page: Page, command: string): Promise<void> {
 /** Open a file and wait for the editor to mount. */
 export async function openFile(page: Page, filename: string): Promise<void> {
   if (await openExplorerFile(page, filename)) {
+    await activateTally(page);
     return;
   }
 
@@ -62,6 +63,8 @@ export async function openFile(page: Page, filename: string): Promise<void> {
     await clickQuickInputRow(page, filename, 30_000);
     await page.locator(".monaco-editor").first().waitFor({ state: "visible" });
   });
+
+  await activateTally(page);
 }
 
 /**
@@ -107,6 +110,14 @@ async function openExplorerFile(page: Page, filename: string): Promise<boolean> 
   } catch {
     return false;
   }
+}
+
+async function activateTally(page: Page): Promise<void> {
+  await runCommand(page, "Tally: Restart server");
+  await page.locator(".statusbar-item").filter({ hasText: "tally" }).first().waitFor({
+    state: "visible",
+    timeout: 30_000,
+  });
 }
 
 /** Retry a palette/quick-open interaction up to 3 times, pressing Escape between attempts. */
