@@ -22,7 +22,7 @@ local preCommitSteps = new Mapping<String, Step> {
   ["ts-typecheck"] {
     glob = List("_integrations/vscode-tally/**/*.ts")
     dir = "_integrations/vscode-tally"
-    check = "bunx @typescript/native-preview --noEmit"
+    check = "bunx typescript --noEmit"
   }
   ["ts-lint"] = (Builtins.ox_lint) {
     glob =

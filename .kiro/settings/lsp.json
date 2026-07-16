@@ -59,7 +59,7 @@
       "name": "typescript",
       "command": "bunx",
       "args": [
-        "@typescript/native-preview",
+        "typescript",
         "--lsp",
         "--stdio"
       ],
