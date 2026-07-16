@@ -1,7 +1,7 @@
 {
   "lspServers": {
     "typescript": {
-      "command": "./_integrations/vscode-tally/node_modules/.bin/tsgo",
+      "command": "./_integrations/vscode-tally/node_modules/.bin/tsc",
       "args": ["--lsp", "--stdio"],
       "fileExtensions": {
         ".ts": "typescript"
