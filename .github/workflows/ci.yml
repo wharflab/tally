@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Build
@@ -165,7 +165,7 @@ jobs:
         with:
           artifact-name: shellcheck-wasm
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Build
@@ -178,7 +178,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Verify schema generation invariants
@@ -194,7 +194,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Add deadcode problem matcher
