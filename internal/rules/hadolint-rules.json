@@ -378,6 +378,12 @@
     "severity": "Info"
   },
   {
+    "code": "DL3067",
+    "description": "Do not copy an entire filesystem from another stage",
+    "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3067",
+    "severity": "Warning"
+  },
+  {
     "code": "DL4000",
     "description": "MAINTAINER is deprecated.",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL4000",
