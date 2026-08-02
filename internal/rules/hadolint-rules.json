@@ -366,6 +366,12 @@
     "severity": "Warning"
   },
   {
+    "code": "DL3064",
+    "description": "Potentially sensitive data should not be used in the `ARG` or `ENV` commands",
+    "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3064",
+    "severity": "Warning"
+  },
+  {
     "code": "DL3065",
     "description": "Setting `FROM --platform` to predefined `$TARGETPLATFORM` in is redundant as this is the default behavior",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3065",
