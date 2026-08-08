@@ -16,9 +16,12 @@ description: |
   that `download-shellcheck-wasm` consumes.
 
   The setup-buildx-action step installs a recent upstream BuildKit so the
-  Dockerfile's `ADD <git-url>?ref=...` instructions work against github.com
-  and gitlab.haskell.org — older BuildKit shipped with some Docker Engine
-  releases mishandles the 301 redirect that drops `.git` from the URL.
+  Dockerfile's `ADD <git-url>?ref=...` instructions work against github.com —
+  older BuildKit shipped with some Docker Engine releases mishandles the git
+  ADD and downloads the URL as a single file instead of cloning it. Both git
+  inputs (ghc-wasm-meta, shellcheck) are cloned from github.com because
+  gitlab.haskell.org now sits behind an Anubis anti-bot gateway that blocks
+  BuildKit's sandboxed git client.
 inputs:
   artifact-name:
     description: |

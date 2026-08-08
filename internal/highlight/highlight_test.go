@@ -178,37 +178,37 @@ func TestAnalyze_ShellcheckWasmDockerfile(t *testing.T) {
 	lines := strings.Split(string(source), "\n")
 
 	// Line indices are 0-based. The file has:
-	//   line 36 (1-based 37): RUN --mount=type=cache,...
-	//   line 37 (1-based 38): \t--mount=type=bind,source=rewrites,target=/rewrites,readonly \
-	//   line 38 (1-based 39): \t<<EOF
+	//   line 42 (1-based 43): RUN --mount=type=cache,...
+	//   line 43 (1-based 44): \t--mount=type=bind,source=rewrites,target=/rewrites,readonly \
+	//   line 44 (1-based 45): \t<<EOF
 	// Verify the offsets to guard against the file drifting.
-	requireLinePrefix(t, lines, 36, "RUN --mount=type=cache")
-	requireLinePrefix(t, lines, 37, "\t--mount=type=bind,source=rewrites")
-	requireLinePrefix(t, lines, 38, "\t<<EOF")
+	requireLinePrefix(t, lines, 42, "RUN --mount=type=cache")
+	requireLinePrefix(t, lines, 43, "\t--mount=type=bind,source=rewrites")
+	requireLinePrefix(t, lines, 44, "\t<<EOF")
 
-	runLine := doc.LineTokens(36)
+	runLine := doc.LineTokens(42)
 	assertHasLineToken(t, source, runLine, core.TokenKeyword, "RUN")
 	assertHasLineToken(t, source, runLine, core.TokenParameter, "--mount")
 
 	// The second --mount flag sits on a continuation line between the RUN
 	// startLine and the heredoc opener. The LSP must emit flag/kv tokens for
 	// it; previously it was excluded as heredoc body.
-	secondMount := doc.LineTokens(37)
+	secondMount := doc.LineTokens(43)
 	assertHasLineToken(t, source, secondMount, core.TokenParameter, "--mount")
 	assertHasLineToken(t, source, secondMount, core.TokenProperty, "type")
 	assertHasLineToken(t, source, secondMount, core.TokenString, "bind")
 	assertHasLineToken(t, source, secondMount, core.TokenProperty, "source")
 	assertHasLineToken(t, source, secondMount, core.TokenString, "rewrites")
 
-	openerLine := doc.LineTokens(38)
+	openerLine := doc.LineTokens(44)
 	assertHasLineToken(t, source, openerLine, core.TokenOperator, "<<")
 	assertHasLineToken(t, source, openerLine, core.TokenKeyword, "EOF")
 
-	// The matching terminator line (105, 0-based) reads `EOF` on its own.
+	// The matching terminator line (111, 0-based) reads `EOF` on its own.
 	// Verify we emit a keyword token there too so the grammar's closing tag
 	// styling still applies under semantic highlighting.
-	requireLinePrefix(t, lines, 105, "EOF")
-	terminatorLine := doc.LineTokens(105)
+	requireLinePrefix(t, lines, 111, "EOF")
+	terminatorLine := doc.LineTokens(111)
 	assertHasLineToken(t, source, terminatorLine, core.TokenKeyword, "EOF")
 }
 

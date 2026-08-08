@@ -18,7 +18,13 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
 
 ARG GHC_WASM_META_COMMIT
 
-ADD "https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta.git?ref=${GHC_WASM_META_COMMIT}" /ghc/
+# Clone from the official read-only GitHub mirror rather than the upstream
+# gitlab.haskell.org repo: gitlab.haskell.org now sits behind an Anubis
+# anti-bot proof-of-work gateway that serves an HTML challenge to BuildKit's
+# sandboxed git client, breaking `ADD <git-url>` clones. The mirror
+# (github.com/haskell-wasm/ghc-wasm-meta) is byte-for-byte identical and is
+# not gated. See _tools/shellcheck-wasm/versions.env for the pinned commit.
+ADD "https://github.com/haskell-wasm/ghc-wasm-meta.git?ref=${GHC_WASM_META_COMMIT}" /ghc/
 
 WORKDIR /ghc
 

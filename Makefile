@@ -173,18 +173,28 @@ SHELLCHECK_WASM_INPUTS := \
 	_tools/shellcheck-wasm/Reactor.hs \
 	$(wildcard _tools/shellcheck-wasm/rewrites/*.yml)
 
+# The Dockerfile clones its inputs via BuildKit `ADD <git-url>?ref=...`, which
+# only works on a recent upstream BuildKit. The `default` buildx builder uses
+# the BuildKit embedded in Docker Engine, which on older engines mishandles the
+# git ADD (silently downloading the URL as a single file instead of cloning).
+# So we provision a dedicated `docker-container` builder that pulls a modern
+# standalone BuildKit — the same approach CI takes via docker/setup-buildx-action.
+SHELLCHECK_WASM_BUILDER := tally-shellcheck-wasm
+
 shellcheck-wasm: $(SHELLCHECK_WASM)
 
 $(SHELLCHECK_WASM): $(SHELLCHECK_WASM_INPUTS)
 	@mkdir -p $(dir $@)
+	@docker buildx inspect $(SHELLCHECK_WASM_BUILDER) >/dev/null 2>&1 \
+		|| docker buildx create --name $(SHELLCHECK_WASM_BUILDER) --driver docker-container --bootstrap
 	docker buildx build \
+		--builder $(SHELLCHECK_WASM_BUILDER) \
 		--progress=plain \
 		--build-arg GHC_WASM_META_COMMIT="$(GHC_WASM_META_COMMIT)" \
 		--build-arg SHELLCHECK_VERSION="$(patsubst v%,%,$(SHELLCHECK_VERSION))" \
 		--build-arg AST_GREP_VERSION="$(AST_GREP_VERSION)" \
-		-t tally-shellcheck-wasm -f _tools/shellcheck-wasm/Dockerfile _tools/shellcheck-wasm
-	# Extract the built shellcheck.wasm from the container.
-	docker cp "$$(docker create --rm tally-shellcheck-wasm):/shellcheck.wasm" $@
+		--output type=local,dest=$(dir $@) \
+		-f _tools/shellcheck-wasm/Dockerfile _tools/shellcheck-wasm
 	@touch $@
 
 # Force-rebuild target kept for humans who want to refresh after pulling new
