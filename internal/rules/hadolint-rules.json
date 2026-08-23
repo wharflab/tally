@@ -1,7 +1,7 @@
 [
   {
     "code": "DL1001",
-    "description": "Please refrain from using inline ignore pragmas `# hadolint ignore=DLxxxx`.",
+    "description": "Please refrain from using inline ignore pragmas # hadolint ignore=DLxxxx",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL1001",
     "severity": "Ignore"
   },
@@ -349,7 +349,7 @@
   },
   {
     "code": "DL3061",
-    "description": "Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment.",
+    "description": "Invalid instruction order. Dockerfile must begin with FROM, ARG or comment.",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3061",
     "severity": "Error"
   },
@@ -361,13 +361,19 @@
   },
   {
     "code": "DL3063",
-    "description": "stage name should not be a reserved word",
+    "description": "Stage name should not be a reserved word",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3063",
     "severity": "Warning"
   },
   {
+    "code": "DL3064",
+    "description": "Potentially sensitive data should not be used in the ARG or ENV commands",
+    "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3064",
+    "severity": "Warning"
+  },
+  {
     "code": "DL3065",
-    "description": "Setting `FROM --platform` to predefined `$TARGETPLATFORM` in is redundant as this is the default behavior",
+    "description": "Setting FROM --platform to predefined $TARGETPLATFORM in is redundant as this is the default behavior",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3065",
     "severity": "Warning"
   },
