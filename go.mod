@@ -1,6 +1,6 @@
 module github.com/wharflab/tally
 
-go 1.27.0
+go 1.27.2
 
 require (
 	charm.land/bubbles/v2 v2.1.1
