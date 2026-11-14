@@ -41,14 +41,14 @@ require (
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/tree-sitter/go-tree-sitter v0.24.0
 	github.com/wharflab/tree-sitter-batch v0.11.1
 	github.com/wharflab/tree-sitter-powershell v0.38.1
 	github.com/zricethezav/gitleaks/v8 v8.30.1
 	go.bug.st/lsp v0.1.3
-	go.opentelemetry.io/otel v1.45.0
+	go.opentelemetry.io/otel v1.47.0
 	go.podman.io/image/v5 v5.41.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
@@ -290,10 +290,11 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.44.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.44.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.44.0 // indirect
-	go.opentelemetry.io/otel/metric v1.45.0 // indirect
+	go.opentelemetry.io/otel/log v1.47.0 // indirect
+	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
-	go.opentelemetry.io/otel/trace v1.45.0 // indirect
+	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.podman.io/storage v1.64.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
