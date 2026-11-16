@@ -5,7 +5,9 @@
     ":gitSignOff",
     ":semanticCommits"
   ],
-  "dependencyDashboard": false,
+  "dependencyDashboard": {
+    "enabled": false
+  },
   "automerge": true,
   "platformAutomerge": true,
   "lockFileMaintenance": {
